@@ -1,0 +1,1 @@
+CREATE INDEX `development_records_nis_idx` ON `development_records` (`nis`);

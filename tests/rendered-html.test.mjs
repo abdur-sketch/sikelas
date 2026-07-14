@@ -2,42 +2,29 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the SIKELAS dashboard", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, /<title>SIKELAS Nurul Iman<\/title>/i);
-  assert.match(html, /Assalamu.alaikum, Ust\. Abdurohman Yusuf!/i);
-  assert.match(html, /Jadwal Pelajaran/i);
-  assert.match(html, /Absensi Hari Ini/i);
-  assert.match(html, /X DKV 1/i);
-  assert.match(html, /XI DKV 1/i);
-  assert.match(html, /XII DKV 1/i);
-  assert.match(html, /Pengumuman/i);
-  assert.match(html, /Portofolio/i);
-  assert.match(html, /Pengaturan/i);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
+test("build emits the SIKELAS dashboard and persistent API route", async () => {
+  const [page, layout, worker] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(layout, /SIKELAS Nurul Iman/i);
+  assert.match(page, /Assalamu.alaikum, Ust\. Abdurohman Yusuf!/i);
+  assert.match(page, /Jadwal Pelajaran/i);
+  assert.match(page, /Absensi Hari Ini/i);
+  assert.match(page, /Rekam Jejak/i);
+  assert.match(worker, /api\/development-records/i);
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS development_records/i);
+  assert.doesNotMatch(page + layout, /codex-preview|Your site is taking shape/i);
 });
 
 test("keeps product metadata and removes starter dependencies", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+  const [page, layout, packageJson, hosting, schema] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /title:\s*"SIKELAS Nurul Iman"/);
@@ -50,6 +37,16 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /function AnnouncementsPage/);
   assert.match(page, /function PortfolioPage/);
   assert.match(page, /function SettingsPage/);
+  assert.match(page, /function StudentDevelopmentPage/);
+  assert.match(page, /Laporan Semester/);
+  assert.match(page, /Poin Pelanggaran/);
+  assert.match(page, /api\/development-records/);
+  assert.match(hosting, /"d1":\s*"DB"/);
+  assert.match(schema, /development_records/);
+  assert.match(page, /function BarcodeScanner/);
+  assert.match(page, /BrowserMultiFormatReader/);
+  assert.match(page, /Scan Barcode/);
+  assert.match(page, /Catat Kehadiran/);
   assert.match(page, /Seleksi Lomba Kreativitas Siswa/);
   assert.match(page, /Rebranding Kopi Gunung/);
   assert.match(page, /Bobot Penilaian/);

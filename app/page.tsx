@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { findStudentByBarcode } from "./barcode";
+import { initialDevelopmentRecords } from "./development-records";
+import { getDevelopmentPredicate, normalizeDevelopmentPoints, summarizeStudentPoints, type DevelopmentRecord, type DevelopmentType } from "./student-points";
 
-type PageKey = "dashboard" | "siswa" | "absensi" | "jadwal" | "tugas" | "pengumuman" | "portofolio" | "pengaturan";
+type PageKey = "dashboard" | "siswa" | "absensi" | "jadwal" | "tugas" | "perkembangan" | "pengumuman" | "portofolio" | "pengaturan";
 type Attendance = "Hadir" | "Sakit" | "Izin" | "Alpa" | "Terlambat";
 
 const classOptions = [
@@ -12,12 +15,12 @@ const classOptions = [
 ] as const;
 
 const students = [
-  { name: "Alya Regina", nis: "231001", class: "XI DKV 1", gender: "p", guardian: "0812 3456 7890", status: "Aktif", initials: "AF", color: "mint" },
-  { name: "Malikha Abimanyu", nis: "231002", class: "XI DKV 1", gender: "P", guardian: "0857 1122 3344", status: "Aktif", initials: "AP", color: "peach" },
-  { name: "Rista Ayu Dewi", nis: "231003", class: "XI DKV 1", gender: "p", guardian: "0813 9087 6543", status: "Aktif", initials: "BM", color: "blue" },
-  { name: "Sinar Lorenza", nis: "231004", class: "XI DKV 1", gender: "P", guardian: "0821 4455 6677", status: "Aktif", initials: "CL", color: "lilac" },
-  { name: "Zahra Khairunnisa", nis: "231005", class: "XI DKV 1", gender: "p", guardian: "0895 7788 9900", status: "Aktif", initials: "DP", color: "yellow" },
-  { name: "Jilan Afifah", nis: "231006", class: "XI DKV 1", gender: "P", guardian: "0819 2233 4455", status: "Aktif", initials: "FN", color: "pink" },
+  { name: "Alya Regina", nis: "231001", class: "XI DKV 1", gender: "P", guardian: "0812 3456 7890", status: "Aktif", initials: "AR", color: "mint" },
+  { name: "Malikha Abimanyu", nis: "231002", class: "XI DKV 1", gender: "P", guardian: "0857 1122 3344", status: "Aktif", initials: "MA", color: "peach" },
+  { name: "Rista Ayu Dewi", nis: "231003", class: "XI DKV 1", gender: "P", guardian: "0813 9087 6543", status: "Aktif", initials: "RD", color: "blue" },
+  { name: "Sinar Lorenza", nis: "231004", class: "XI DKV 1", gender: "P", guardian: "0821 4455 6677", status: "Aktif", initials: "SL", color: "lilac" },
+  { name: "Zahra Khairunnisa", nis: "231005", class: "XI DKV 1", gender: "P", guardian: "0895 7788 9900", status: "Aktif", initials: "ZK", color: "yellow" },
+  { name: "Jilan Afifah", nis: "231006", class: "XI DKV 1", gender: "P", guardian: "0819 2233 4455", status: "Aktif", initials: "JA", color: "pink" },
 ];
 
 const schedule = [
@@ -58,6 +61,7 @@ const navItems: { key: PageKey; label: string; icon: string }[] = [
   { key: "absensi", label: "Absensi", icon: "✓" },
   { key: "jadwal", label: "Jadwal Pelajaran", icon: "□" },
   { key: "tugas", label: "Tugas & Nilai", icon: "✎" },
+  { key: "perkembangan", label: "Rekam Jejak", icon: "★" },
 ];
 
 const secondaryNavItems: { key: PageKey; label: string; icon: string }[] = [
@@ -72,6 +76,7 @@ const pageMeta: Record<PageKey, { eyebrow: string; title: string; subtitle: stri
   absensi: { eyebrow: "Selasa, 14 Juli 2026", title: "Absensi Harian", subtitle: "Catat kehadiran siswa dengan cepat dan akurat." },
   jadwal: { eyebrow: "Semester Ganjil 2026/2027", title: "Jadwal Pelajaran", subtitle: "Agenda belajar kelas XI DKV 1 selama satu pekan." },
   tugas: { eyebrow: "Pembelajaran", title: "Tugas & Nilai", subtitle: "Pantau pengumpulan tugas dan perkembangan nilai siswa." },
+  perkembangan: { eyebrow: "Pembinaan siswa", title: "Rekam Jejak Siswa", subtitle: "Akumulasi portofolio, prestasi, pelanggaran, dan laporan akhir semester XI DKV 1." },
   pengumuman: { eyebrow: "Komunikasi sekolah", title: "Pengumuman", subtitle: "Sampaikan informasi akademik, kegiatan, dan pesan kepada siswa serta wali santri." },
   portofolio: { eyebrow: "Galeri karya DKV", title: "Portofolio Siswa", subtitle: "Dokumentasikan karya, pencapaian, dan perkembangan kreatif siswa XI DKV 1." },
   pengaturan: { eyebrow: "Konfigurasi sistem", title: "Pengaturan", subtitle: "Atur profil sekolah, kelas, penilaian, absensi, notifikasi, dan hak akses." },
@@ -167,17 +172,130 @@ function Students({ activeClass }: { activeClass: (typeof classOptions)[number] 
   );
 }
 
+function BarcodeScanner({ onDetected }: { onDetected: (code: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const lastDetectionRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const [scanning, setScanning] = useState(false);
+  const [cameraState, setCameraState] = useState<"idle" | "loading" | "active" | "error">("idle");
+  const [cameraMessage, setCameraMessage] = useState("Kamera belum diaktifkan.");
+
+  useEffect(() => {
+    if (!scanning) return;
+
+    let cancelled = false;
+    let scannerControls: { stop: () => void } | undefined;
+    const video = videoRef.current;
+
+    const startCamera = async () => {
+      setCameraState("loading");
+      setCameraMessage("Meminta izin kamera...");
+
+      try {
+        if (cancelled || !video) return;
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const reader = new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 250, delayBetweenScanSuccess: 1000 });
+        scannerControls = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" } }, audio: false },
+          video,
+          (result) => {
+            const code = result?.getText();
+            const now = Date.now();
+            if (code && (lastDetectionRef.current.code !== code || now - lastDetectionRef.current.at > 3000)) {
+              lastDetectionRef.current = { code, at: now };
+              onDetected(code);
+            }
+          },
+        );
+        if (cancelled) {
+          scannerControls.stop();
+          return;
+        }
+        setCameraState("active");
+        setCameraMessage("Arahkan barcode kartu siswa ke area kamera.");
+      } catch {
+        setCameraState("error");
+        setCameraMessage("Kamera tidak dapat dibuka. Periksa izin kamera atau gunakan input kode manual.");
+        setScanning(false);
+      }
+    };
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      scannerControls?.stop();
+      if (video) video.srcObject = null;
+    };
+  }, [scanning, onDetected]);
+
+  return <div className="scanner-camera">
+    <div className={`camera-preview ${cameraState}`}>
+      <video ref={videoRef} muted playsInline aria-label="Pratinjau kamera pemindai barcode" />
+      <div className="scan-frame"><span /><span /><span /><span /></div>
+      {cameraState !== "active" && <div className="camera-placeholder"><b>▦</b><span>{cameraMessage}</span></div>}
+    </div>
+    <div className="camera-actions">
+      <div><strong>Pemindai Barcode</strong><small>{cameraState === "active" ? "Kamera aktif · ZXing multi-format" : cameraMessage}</small></div>
+      <button className={scanning ? "secondary-button" : "primary-button"} type="button" onClick={() => {
+        if (scanning) {
+          setCameraState("idle");
+          setCameraMessage("Kamera dinonaktifkan.");
+        }
+        setScanning((value) => !value);
+      }}>{scanning ? "Matikan Kamera" : "Aktifkan Kamera"}</button>
+    </div>
+  </div>;
+}
+
 function AttendancePage({ activeClass }: { activeClass: string }) {
   const [attendance, setAttendance] = useState<Record<string, Attendance>>(() => Object.fromEntries(students.map((student, index) => [student.nis, index === 3 ? "Sakit" : "Hadir"])));
+  const [mode, setMode] = useState<"barcode" | "manual">("barcode");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [scanNotice, setScanNotice] = useState<{ type: "success" | "error" | "info"; message: string }>({ type: "info", message: "Gunakan barcode kartu siswa atau masukkan NIS untuk mencatat kehadiran." });
+  const [scanHistory, setScanHistory] = useState<{ nis: string; name: string; time: string }[]>([]);
   const totals = useMemo(() => Object.values(attendance).reduce<Record<Attendance, number>>((result, status) => ({ ...result, [status]: result[status] + 1 }), { Hadir: 0, Sakit: 0, Izin: 0, Alpa: 0, Terlambat: 0 }), [attendance]);
+
+  const registerBarcode = useCallback((rawCode: string) => {
+    const normalizedCode = rawCode.trim();
+    const student = findStudentByBarcode(normalizedCode, students);
+
+    if (!student) {
+      setScanNotice({ type: "error", message: `Barcode “${normalizedCode || "kosong"}” tidak terdaftar pada ${activeClass}.` });
+      return;
+    }
+
+    const time = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+    setAttendance((current) => ({ ...current, [student.nis]: "Hadir" }));
+    setScanHistory((current) => [{ nis: student.nis, name: student.name, time }, ...current.filter((item) => item.nis !== student.nis)].slice(0, 5));
+    setScanNotice({ type: "success", message: `${student.name} berhasil dicatat hadir pada ${time}.` });
+    setBarcodeInput("");
+  }, [activeClass]);
+
   return (
     <>
       <section className="attendance-summary">{(["Hadir", "Sakit", "Izin", "Alpa", "Terlambat"] as Attendance[]).map((status) => <div key={status}><span className={`legend-dot ${status.toLowerCase()}`}></span><strong>{totals[status]}</strong><small>{status}</small></div>)}</section>
+      <div className="segmented attendance-mode"><button className={mode === "barcode" ? "active" : ""} onClick={() => setMode("barcode")}>▦ Scan Barcode</button><button className={mode === "manual" ? "active" : ""} onClick={() => setMode("manual")}>✓ Input Manual</button></div>
+      {mode === "barcode" && <section className="barcode-layout">
+        <article className="panel scanner-panel">
+          <BarcodeScanner onDetected={registerBarcode} />
+          <form className="barcode-entry" onSubmit={(event) => { event.preventDefault(); registerBarcode(barcodeInput); }}>
+            <label htmlFor="barcode-code">Kode barcode / NIS</label>
+            <div><input id="barcode-code" autoComplete="off" autoFocus value={barcodeInput} onChange={(event) => setBarcodeInput(event.target.value)} placeholder="Contoh: 231001" /><button className="primary-button" disabled={!barcodeInput.trim()} type="submit">Catat Kehadiran</button></div>
+            <small>Tip: pembaca barcode USB dapat langsung mengetik kode di kolom ini lalu menekan Enter.</small>
+          </form>
+          <div className={`scan-notice ${scanNotice.type}`} role="status"><span>{scanNotice.type === "success" ? "✓" : scanNotice.type === "error" ? "!" : "i"}</span>{scanNotice.message}</div>
+        </article>
+        <aside className="panel scan-history">
+          <div><p className="section-kicker">PEMINDAIAN TERBARU</p><h2>Riwayat Hari Ini</h2></div>
+          {scanHistory.length ? <div className="history-list">{scanHistory.map((item) => <div key={item.nis}><span className="history-check">✓</span><span><strong>{item.name}</strong><small>NIS {item.nis}</small></span><time>{item.time}</time></div>)}</div> : <div className="history-empty"><span>▦</span><p>Belum ada barcode yang dipindai pada sesi ini.</p></div>}
+          <div className="barcode-guide"><strong>Isi barcode kartu siswa</strong><span>NIS enam digit, contoh: <b>231001</b></span></div>
+        </aside>
+      </section>}
+      {mode === "manual" &&
       <article className="panel data-panel">
         <div className="toolbar"><div><h2>Kehadiran {activeClass}</h2><p className="muted">Jam pertama · Desain Grafis</p></div><button className="secondary-button">□ 14 Juli 2026</button></div>
         <div className="attendance-rows">{students.map((student, index) => <div className="attendance-row" key={student.nis}><span className="row-number">{String(index + 1).padStart(2, "0")}</span><span className={`avatar ${student.color}`}>{student.initials}</span><div className="attendance-name"><strong>{student.name}</strong><span>{student.nis}</span></div><div className="attendance-options">{(["Hadir", "Sakit", "Izin", "Alpa", "Terlambat"] as Attendance[]).map((status) => <button className={attendance[student.nis] === status ? `selected ${status.toLowerCase()}` : ""} key={status} onClick={() => setAttendance({ ...attendance, [student.nis]: status })}>{status}</button>)}</div></div>)}</div>
         <div className="sticky-action"><span>Perubahan tersimpan otomatis sebagai draf.</span><button className="primary-button" onClick={() => alert("Absensi berhasil disimpan.")}>Simpan Absensi</button></div>
-      </article>
+      </article>}
     </>
   );
 }
@@ -233,6 +351,108 @@ function PortfolioPage({ activeClass }: { activeClass: string }) {
   </>;
 }
 
+function StudentDevelopmentPage({ activeClass }: { activeClass: string }) {
+  const [records, setRecords] = useState<DevelopmentRecord[]>(initialDevelopmentRecords);
+  const [selectedNis, setSelectedNis] = useState(students[0].nis);
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<"rekap" | "laporan">("rekap");
+  const [storageState, setStorageState] = useState<"loading" | "ready" | "saving" | "error">("loading");
+  const [storageMessage, setStorageMessage] = useState("Memuat data tersimpan...");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/development-records")
+      .then(async (response) => {
+        const payload = await response.json() as { records?: DevelopmentRecord[]; error?: string };
+        if (!response.ok || !payload.records) throw new Error(payload.error ?? "Gagal memuat data.");
+        if (!cancelled) {
+          setRecords(payload.records);
+          setStorageState("ready");
+          setStorageMessage("Data tersimpan permanen.");
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setStorageState("error");
+          setStorageMessage(error instanceof Error ? error.message : "Database tidak dapat diakses.");
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+  const selectedStudent = students.find((student) => student.nis === selectedNis) ?? students[0];
+  const selectedSummary = summarizeStudentPoints(selectedStudent.nis, records);
+  const summaries = students.map((student) => ({ student, summary: summarizeStudentPoints(student.nis, records) }));
+  const filtered = summaries.filter(({ student }) => student.name.toLowerCase().includes(query.toLowerCase()) || student.nis.includes(query));
+  const totalAchievements = records.filter((record) => record.type === "Prestasi").length;
+  const totalViolations = records.filter((record) => record.type === "Pelanggaran").length;
+  const classAverage = Math.round(summaries.reduce((sum, item) => sum + item.summary.totalPoints, 0) / summaries.length);
+
+  const addRecord = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const type = form.get("type") as DevelopmentType;
+    const nis = String(form.get("nis"));
+    const record: DevelopmentRecord = {
+      id: "",
+      nis,
+      type,
+      title: String(form.get("title")),
+      detail: String(form.get("detail")),
+      date: String(form.get("date")),
+      points: normalizeDevelopmentPoints(type, Number(form.get("points"))),
+    };
+    setStorageState("saving");
+    setStorageMessage("Menyimpan catatan...");
+    try {
+      const response = await fetch("/api/development-records", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(record) });
+      const payload = await response.json() as { record?: DevelopmentRecord; error?: string };
+      if (!response.ok || !payload.record) throw new Error(payload.error ?? "Gagal menyimpan catatan.");
+      setRecords((current) => [payload.record!, ...current]);
+      setSelectedNis(nis);
+      setAdding(false);
+      setView("laporan");
+      setStorageState("ready");
+      setStorageMessage("Catatan tersimpan permanen.");
+    } catch (error) {
+      setStorageState("error");
+      setStorageMessage(error instanceof Error ? error.message : "Gagal menyimpan catatan.");
+    }
+  };
+
+  const deleteRecord = async (record: DevelopmentRecord) => {
+    if (!window.confirm(`Hapus catatan “${record.title}”?`)) return;
+    setStorageState("saving");
+    setStorageMessage("Menghapus catatan...");
+    try {
+      const response = await fetch(`/api/development-records?id=${encodeURIComponent(record.id)}`, { method: "DELETE" });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Gagal menghapus catatan.");
+      setRecords((current) => current.filter((item) => item.id !== record.id));
+      setStorageState("ready");
+      setStorageMessage("Catatan berhasil dihapus.");
+    } catch (error) {
+      setStorageState("error");
+      setStorageMessage(error instanceof Error ? error.message : "Gagal menghapus catatan.");
+    }
+  };
+
+  return <>
+    <section className="development-stats"><article><span className="module-icon teal">◇</span><div><strong>{records.filter((record) => record.type === "Portofolio").length}</strong><small>Total portofolio</small></div></article><article><span className="module-icon blue">★</span><div><strong>{totalAchievements}</strong><small>Catatan prestasi</small></div></article><article><span className="module-icon orange">!</span><div><strong>{totalViolations}</strong><small>Catatan pelanggaran</small></div></article><article><span className="module-icon purple">∑</span><div><strong>{classAverage}</strong><small>Rata-rata poin kelas</small></div></article></section>
+    <div className="storage-status-row"><span className={`storage-status ${storageState}`}><i>{storageState === "error" ? "!" : storageState === "loading" || storageState === "saving" ? "↻" : "✓"}</i>{storageMessage}</span></div>
+    <div className="development-actions"><div className="segmented"><button className={view === "rekap" ? "active" : ""} onClick={() => setView("rekap")}>Rekap Semua Siswa</button><button className={view === "laporan" ? "active" : ""} onClick={() => setView("laporan")}>Laporan Semester</button></div><button className="primary-button" disabled={storageState === "loading" || storageState === "saving"} onClick={() => setAdding((value) => !value)}>{adding ? "Tutup Form" : "＋ Tambah Catatan"}</button></div>
+    {adding && <form className="panel development-form" onSubmit={addRecord}><div className="form-grid"><label>Nama siswa<select name="nis" defaultValue={selectedNis}>{students.map((student) => <option value={student.nis} key={student.nis}>{student.name} · {student.nis}</option>)}</select></label><label>Jenis catatan<select name="type" defaultValue="Portofolio"><option>Portofolio</option><option>Prestasi</option><option>Pelanggaran</option></select></label><label>Judul catatan<input name="title" required placeholder="Contoh: Juara lomba desain" /></label><label>Tanggal<input name="date" type="date" required defaultValue="2026-07-15" /></label><label>Poin<input name="points" type="number" required min="1" defaultValue="10" /><small>Pelanggaran otomatis menjadi poin pengurang.</small></label><label>Keterangan<textarea name="detail" required rows={3} placeholder="Tuliskan keterangan dan bukti pendukung..." /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setAdding(false)}>Batal</button><button type="submit" className="primary-button">Simpan Catatan</button></div></form>}
+    {view === "rekap" ? <article className="panel data-panel development-table"><div className="toolbar"><label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS..." /></label><span className="settings-tag">Semester Ganjil 2026/2027</span></div><div className="table-scroll"><table><thead><tr><th>Siswa</th><th>Portofolio</th><th>Poin Prestasi</th><th>Poin Pelanggaran</th><th>Total Poin</th><th>Predikat</th><th></th></tr></thead><tbody>{filtered.map(({ student, summary }) => <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><span><strong>{student.name}</strong><small>{student.nis}</small></span></div></td><td><b>{summary.portfolioCount}</b> karya <small>+{summary.portfolioPoints} poin</small></td><td><span className="point positive">+{summary.achievementPoints}</span></td><td><span className="point negative">-{summary.violationPoints}</span></td><td><strong className="total-point">{summary.totalPoints}</strong></td><td><span className={`predicate ${summary.totalPoints < 20 ? "warning" : ""}`}>{getDevelopmentPredicate(summary.totalPoints)}</span></td><td><button className="secondary-button" onClick={() => { setSelectedNis(student.nis); setView("laporan"); }}>Lihat Laporan</button></td></tr>)}</tbody></table></div></article> : <article className="panel semester-report">
+      <div className="report-toolbar"><label>Pilih siswa<select value={selectedNis} onChange={(event) => setSelectedNis(event.target.value)}>{students.map((student) => <option value={student.nis} key={student.nis}>{student.name}</option>)}</select></label><button className="secondary-button" onClick={() => window.print()}>⎙ Cetak Laporan</button></div>
+      <header className="report-header"><div><Logo /><span><strong>SIKELAS NURUL IMAN</strong><small>Laporan Perkembangan Siswa</small></span></div><span>Semester Ganjil · Tahun Ajaran 2026/2027</span></header>
+      <section className="student-report-profile"><span className={`avatar ${selectedStudent.color}`}>{selectedStudent.initials}</span><div><h2>{selectedStudent.name}</h2><p>NIS {selectedStudent.nis} · {activeClass}</p></div><span className="report-predicate"><small>Predikat Akhir</small><strong>{getDevelopmentPredicate(selectedSummary.totalPoints)}</strong></span></section>
+      <section className="report-point-grid"><div><span>◇</span><strong>{selectedSummary.portfolioCount}</strong><small>Portofolio · +{selectedSummary.portfolioPoints} poin</small></div><div><span>★</span><strong>+{selectedSummary.achievementPoints}</strong><small>Poin prestasi</small></div><div><span>!</span><strong>-{selectedSummary.violationPoints}</strong><small>Poin pelanggaran</small></div><div className="report-total"><span>∑</span><strong>{selectedSummary.totalPoints}</strong><small>Total poin semester</small></div></section>
+      <section className="report-records"><h3>Rincian Rekam Jejak</h3>{selectedSummary.records.length ? selectedSummary.records.map((record) => <div className="report-record" key={record.id}><span className={`record-symbol ${record.type.toLowerCase()}`}>{record.type === "Portofolio" ? "◇" : record.type === "Prestasi" ? "★" : "!"}</span><div><strong>{record.title}</strong><p>{record.detail}</p><small>{record.type} · {new Date(`${record.date}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</small></div><span className="record-actions"><b className={record.points < 0 ? "negative" : "positive"}>{record.points > 0 ? "+" : ""}{record.points}</b><button type="button" onClick={() => deleteRecord(record)} aria-label={`Hapus ${record.title}`}>×</button></span></div>) : <div className="empty-state"><span>◇</span><strong>Belum ada catatan</strong><p>Tambahkan portofolio, prestasi, atau pelanggaran siswa.</p></div>}</section>
+      <footer className="report-footer"><div><strong>Catatan Wali Kelas</strong><p>{selectedSummary.totalPoints >= 50 ? "Pertahankan prestasi dan terus kembangkan potensi serta tanggung jawab." : selectedSummary.totalPoints >= 20 ? "Terus tingkatkan prestasi, kedisiplinan, dan konsistensi dalam berkarya." : "Diperlukan pendampingan dan pembinaan bersama wali kelas serta wali santri."}</p></div><div><span>Bogor, 18 Desember 2026</span><strong>Abdurohman Yusuf</strong><small>Wali Kelas</small></div></footer>
+    </article>}
+  </>;
+}
+
 function SettingsPage({ activeClass }: { activeClass: (typeof classOptions)[number] }) {
   const [tab, setTab] = useState("Sekolah & Kelas");
   const [saved, setSaved] = useState(false);
@@ -277,7 +497,7 @@ export default function Home() {
         </div>
         <nav aria-label="Menu utama"><small>MENU UTAMA</small>{navItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "tugas" && <i>3</i>}</button>)}</nav>
         <nav className="secondary-nav" aria-label="Menu lainnya"><small>LAINNYA</small>{secondaryNavItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "pengumuman" && <i>3</i>}</button>)}</nav>
-        <div className="sidebar-footer"><button className="user-card"><span className="avatar teacher">SR</span><span><strong>Siti Rahma</strong><small>Guru DKV</small></span><i>•••</i></button><button className="logout" onClick={() => setLoggedIn(false)}>↪ Keluar</button></div>
+        <div className="sidebar-footer"><button className="user-card"><span className="avatar teacher">AY</span><span><strong>Abdurohman Yusuf</strong><small>Guru DKV</small></span><i>•••</i></button><button className="logout" onClick={() => setLoggedIn(false)}>↪ Keluar</button></div>
       </aside>
       {menuOpen && <button className="overlay" onClick={() => setMenuOpen(false)} aria-label="Tutup menu" />}
       <main className="main-content">
@@ -289,6 +509,7 @@ export default function Home() {
           {page === "absensi" && <AttendancePage key={activeClass.label} activeClass={activeClass.label} />}
           {page === "jadwal" && <SchedulePage activeClass={activeClass.label} />}
           {page === "tugas" && <TasksPage activeClass={activeClass} />}
+          {page === "perkembangan" && <StudentDevelopmentPage key={activeClass.label} activeClass={activeClass.label} />}
           {page === "pengumuman" && <AnnouncementsPage activeClass={activeClass.label} />}
           {page === "portofolio" && <PortfolioPage activeClass={activeClass.label} />}
           {page === "pengaturan" && <SettingsPage activeClass={activeClass} />}
