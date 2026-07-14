@@ -70,8 +70,11 @@ body { background:#f3f6f9; color:#343a40; font-family:"Helvetica Neue",Arial,san
 .brand-mark { width:40px; height:40px; border:0; border-radius:5px; background:#18a689; color:#fff; }
 .mark-book { font-size:27px; }.mark-star { color:#ffe08a; }
 .brand strong { font-size:16px; letter-spacing:1.5px; }.brand span { color:#9fb0bf; letter-spacing:2.5px; }
-.class-selector { margin:18px 16px 24px; border:1px solid rgba(255,255,255,.08); border-radius:4px; background:#314354; }
+.class-switcher { position:relative; margin:18px 16px 24px; }
+.class-selector { width:100%; margin:0; padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:4px; background:#314354; color:#fff; display:flex; align-items:center; gap:10px; cursor:pointer; text-align:left; }
 .class-icon { border-radius:4px; background:#18a689; color:#fff; }
+.class-copy { flex:1; display:flex; flex-direction:column; gap:3px; }.class-copy small { color:#91a5b7; font-size:9px; letter-spacing:1.4px; }.class-copy strong { font-size:13px; }.class-chevron { color:#a9bac7; transition:transform .2s; }.class-selector[aria-expanded="true"] .class-chevron { transform:rotate(180deg); }
+.class-menu { position:absolute; z-index:40; left:0; right:0; top:calc(100% + 7px); display:none; padding:6px; border:1px solid rgba(255,255,255,.1); border-radius:5px; background:#1f2c38; box-shadow:0 12px 28px rgba(4,15,24,.3); }.class-menu.open { display:block; }.class-menu>button { width:100%; min-height:48px; padding:7px 9px; border:0; border-radius:4px; background:transparent; color:#c2cfda; display:flex; align-items:center; gap:9px; cursor:pointer; text-align:left; }.class-menu>button:hover,.class-menu>button.active { background:#314354; color:#fff; }.class-menu>button>span:first-child { width:30px; height:30px; border-radius:4px; background:#3a4c5d; display:grid; place-items:center; color:#9fb2c1; font-size:9px; font-weight:800; }.class-menu>button.active>span:first-child { background:#18a689; color:#fff; }.class-menu>button>span:nth-child(2) { flex:1; display:flex; flex-direction:column; gap:2px; }.class-menu strong { font-size:10px; }.class-menu small { color:#8194a5; font-size:8px; }.class-menu b { color:#39c5a7; font-size:11px; }
 .sidebar nav { gap:1px; }.sidebar nav>small { padding:0 22px 9px; color:#718397; }
 .sidebar nav button { min-height:46px; padding:0 20px; border-radius:0; color:#aebdca; font-size:13px; }
 .sidebar nav button:hover { background:#2d3f50; }.sidebar nav button.active { background:#18a689; color:#fff; }

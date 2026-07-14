@@ -21,9 +21,12 @@ test("server-renders the SIKELAS dashboard", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>SIKELAS Nurul Iman<\/title>/i);
-  assert.match(html, /Assalamu.alaikum, Bu Siti!/i);
+  assert.match(html, /Assalamu.alaikum, Ust\. Abdurohman Yusuf!/i);
   assert.match(html, /Jadwal Pelajaran/i);
   assert.match(html, /Absensi Hari Ini/i);
+  assert.match(html, /X DKV 1/i);
+  assert.match(html, /XI DKV 1/i);
+  assert.match(html, /XII DKV 1/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 
@@ -39,6 +42,8 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Data Siswa/);
   assert.match(page, /Absensi Harian/);
   assert.match(page, /Tugas & Nilai/);
+  assert.match(page, /const classOptions/);
+  assert.match(page, /setActiveClass/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout, /codex-preview|_sites-preview|SkeletonPreview/);
 });
