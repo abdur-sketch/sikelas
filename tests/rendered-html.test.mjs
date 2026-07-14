@@ -27,6 +27,9 @@ test("server-renders the SIKELAS dashboard", async () => {
   assert.match(html, /X DKV 1/i);
   assert.match(html, /XI DKV 1/i);
   assert.match(html, /XII DKV 1/i);
+  assert.match(html, /Pengumuman/i);
+  assert.match(html, /Portofolio/i);
+  assert.match(html, /Pengaturan/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 
@@ -44,6 +47,12 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Tugas & Nilai/);
   assert.match(page, /const classOptions/);
   assert.match(page, /setActiveClass/);
+  assert.match(page, /function AnnouncementsPage/);
+  assert.match(page, /function PortfolioPage/);
+  assert.match(page, /function SettingsPage/);
+  assert.match(page, /Seleksi Lomba Kreativitas Siswa/);
+  assert.match(page, /Rebranding Kopi Gunung/);
+  assert.match(page, /Bobot Penilaian/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout, /codex-preview|_sites-preview|SkeletonPreview/);
 });
