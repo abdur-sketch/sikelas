@@ -59,6 +59,7 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Impor CSV/);
   assert.match(page, /Pemulihan/);
   assert.match(page, /Pesawaran, Lampung/);
+  assert.match(page, /api\.open-meteo\.com\/v1\/forecast/);
   assert.match(page, /Laporan Semester/);
   assert.match(page, /Poin Pelanggaran/);
   assert.match(page, /profile-popover/);

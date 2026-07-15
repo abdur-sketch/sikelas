@@ -9,6 +9,7 @@ type PageKey = "dashboard" | "siswa" | "absensi" | "jadwal" | "tugas" | "perkemb
 type Attendance = "Hadir" | "Sakit" | "Izin" | "Alpa" | "Terlambat";
 const todayIso = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const formatIndonesianDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : date;
+const weatherDescription=(code:number)=>code===0?"Cerah":code<=2?"Cerah berawan":code===3?"Mendung":code<=48?"Berkabut":code<=67?"Hujan":code<=77?"Hujan es":code<=82?"Hujan deras":code<=86?"Hujan salju":"Badai petir";
 
 const classOptions = [
   { label: "X DKV 1", short: "X", students: 6, boys: 3, girls: 3, present: 5 },
@@ -577,7 +578,7 @@ export default function Home() {
       .catch(() => { if (active) setAppData(null); });
     return () => { active = false; };
   }, [activeClass.label]);
-  useEffect(()=>{fetch("/api/weather").then(response=>response.json()).then(payload=>setWeather(payload)).catch(()=>setWeather({temperature:null,description:"Data cuaca tidak tersedia",location:"Pesawaran, Lampung"}))},[]);
+  useEffect(()=>{const load=async()=>{try{const response=await fetch("/api/weather");const payload=await response.json() as {temperature:number|null;description:string;location:string};if(payload.temperature!=null){setWeather(payload);return}const direct=await fetch("https://api.open-meteo.com/v1/forecast?latitude=-5.3827&longitude=105.0955&current=temperature_2m,weather_code&timezone=Asia%2FJakarta");const forecast=await direct.json() as {current?:{temperature_2m?:number;weather_code?:number}};if(forecast.current?.temperature_2m==null)throw new Error("Cuaca tidak tersedia");setWeather({temperature:forecast.current.temperature_2m,description:weatherDescription(forecast.current.weather_code??0),location:"Pesawaran, Lampung"})}catch{setWeather({temperature:null,description:"Data cuaca tidak tersedia",location:"Pesawaran, Lampung"})}};load()},[]);
   const studentRows: StudentRow[] = appData?.students.map((student) => ({ ...student, class: activeClass.label })) ?? (activeClass.label === "XI DKV 1" ? students : []);
   const actorName = appData?.actor.name ?? "Abdurohman Yusuf";
   const actorInitials = actorName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
