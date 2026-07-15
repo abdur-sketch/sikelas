@@ -65,6 +65,11 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /profile-popover/);
   assert.match(page, /sidebar-profile-menu/);
   assert.match(page, /sidebarProfileOpen/);
+  assert.match(page, /brand-home/);
+  assert.match(page, /aria-controls="main-sidebar"/);
+  assert.match(page, /aria-controls="class-menu"/);
+  assert.match(page, /closeOutside/);
+  assert.match(page, /closeWithEscape/);
   assert.match(page, /Keluar dari akun/);
   assert.match(page, /Pengaturan akun/);
   assert.match(page, /api\/development-records/);
