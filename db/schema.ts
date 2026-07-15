@@ -2,8 +2,12 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
-  email: text("email").primaryKey(), name: text("name").notNull(), role: text("role").notNull(), classLabel: text("class_label"), studentNis: text("student_nis"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  email: text("email").primaryKey(), name: text("name").notNull(), role: text("role").notNull(), classLabel: text("class_label"), studentNis: text("student_nis"), status: text("status").notNull().default("Pending"), active: integer("active", { mode: "boolean" }).notNull().default(false), approvedBy: text("approved_by"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`), updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const userClassAssignments = sqliteTable("user_class_assignments", {
+  id: text("id").primaryKey(), email: text("email").notNull(), classLabel: text("class_label").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex("user_class_assignment_idx").on(table.email, table.classLabel), index("user_class_email_idx").on(table.email)]);
 
 export const classes = sqliteTable("classes", {
   id: text("id").primaryKey(), label: text("label").notNull(), short: text("short").notNull(), boys: integer("boys").notNull(), girls: integer("girls").notNull(),

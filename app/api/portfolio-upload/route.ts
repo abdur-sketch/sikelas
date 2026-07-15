@@ -1,4 +1,4 @@
-import { audit, ensureDatabase, getActor, getR2, requireWriteRole, todayJakarta } from "../../../db/runtime";
+import { audit, ensureDatabase, getActor, getR2, requireClassAccess, requireWriteRole, todayJakarta } from "../../../db/runtime";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 
@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     if (!allowedTypes.has(file.type)) return Response.json({ error: "Format berkas harus JPG, PNG, WebP, PDF, DOC, atau DOCX." }, { status: 400 });
     const nis=String(form.get("nis")||""); const student=String(form.get("student")||""); const title=String(form.get("title")||""); const classLabel=String(form.get("classLabel")||"");
     if (!nis || !student || !title || !classLabel) return Response.json({ error: "Data karya belum lengkap." }, { status: 400 });
+    requireClassAccess(actor,classLabel);
     const id=crypto.randomUUID(); const key=`portfolio/${classLabel.replaceAll(" ","-")}/${nis}/${id}-${file.name.replace(/[^a-zA-Z0-9._-]/g,"-")}`;
     const bucket=getR2();
     await bucket.put(key,file.stream(),{httpMetadata:{contentType:file.type},customMetadata:{nis,owner:actor.email}});

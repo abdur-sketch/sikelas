@@ -334,3 +334,15 @@ button { -webkit-tap-highlight-color:transparent; }
   .admin-tabs button { height:40px;min-height:40px; }
   .attendance-options button { min-height:36px; }
 }
+
+/* Central administration and account approval */
+.access-page { min-height:100vh;padding:24px;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,rgba(226,182,87,.16),transparent 28rem),linear-gradient(145deg,#0d4935,#082e23); }
+.access-card { width:min(460px,100%);padding:38px;border:1px solid rgba(255,255,255,.16);border-radius:22px;background:rgba(255,255,255,.97);box-shadow:0 28px 80px rgba(0,0,0,.22);text-align:center; }
+.access-card>.brand-mark { margin:0 auto 18px;background:#0f7650;color:#fff; }.access-card>p { margin:0;color:#0f7650;font-size:10px;font-weight:800;letter-spacing:1.8px; }.access-card h1 { margin:11px 0 10px;font-family:Georgia,serif;font-size:27px; }.access-card>span,.access-card>small { display:block;color:#718078;font-size:12px;line-height:1.6; }.access-card>small { margin-top:8px;font-size:10px; }.access-card>a { margin-top:22px;text-decoration:none; }
+.user-management { grid-template-columns:minmax(350px,.78fr) minmax(500px,1.22fr); }
+.class-assignment { margin:4px 0 16px;padding:12px;border:1px solid #dfe7e2;border-radius:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
+.class-assignment legend { padding:0 7px;color:#66766e;font-size:10px;font-weight:700; }.class-assignment label { min-height:48px;padding:8px;border:1px solid #e4ebe7;border-radius:9px;display:flex;align-items:center;gap:8px;background:#fbfcfb;cursor:pointer; }.class-assignment input { width:16px!important;height:16px!important;min-height:0!important;accent-color:#0f7650; }.class-assignment span { display:flex;flex-direction:column;gap:3px;font-size:10px;font-weight:700; }.class-assignment small { color:#8b9791;font-size:8px;font-weight:400; }
+.user-list>div:not(.toolbar) { min-height:76px;padding:10px 0; }.user-list>div:not(.toolbar)>span { min-width:0; }.user-list>div:not(.toolbar)>span strong,.user-list>div:not(.toolbar)>span small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.user-list>div:not(.toolbar)>div { flex-wrap:wrap;justify-content:flex-end; }
+.user-status { min-height:28px;padding:0 9px;border-radius:8px;display:inline-flex;align-items:center;background:#eef2ef;color:#68766f;font-size:8px;font-weight:800;text-transform:uppercase; }.user-status.active { background:#e4f4ec;color:#13734f; }.user-status.pending { background:#fff2d8;color:#9a6c16; }.user-status.nonaktif { background:#f9e8ea;color:#aa4854; }
+@media(max-width:1050px){.user-management{grid-template-columns:1fr}.class-assignment{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.access-card{padding:28px 20px}.class-assignment{grid-template-columns:1fr}.user-list>div:not(.toolbar){align-items:flex-start;flex-direction:column}.user-list>div:not(.toolbar)>div{justify-content:flex-start}}

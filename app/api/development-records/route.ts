@@ -1,6 +1,6 @@
 import { initialDevelopmentRecords } from "../../development-records";
 import { normalizeDevelopmentPoints, type DevelopmentRecord, type DevelopmentType } from "../../student-points";
-import { audit, ensureDatabase, getActor, requireWriteRole } from "../../../db/runtime";
+import { audit, ensureDatabase, getActor, requireClassAccess, requireWriteRole } from "../../../db/runtime";
 
 const allowedTypes: DevelopmentType[] = ["Portofolio", "Prestasi", "Pelanggaran"];
 
@@ -48,9 +48,11 @@ export async function GET(request: Request) {
     if (isPortalViewer && !actor.studentNis) {
       return Response.json({ error: "Akun portal belum terhubung dengan siswa." }, { status: 403 });
     }
+    const requestedClass = new URL(request.url).searchParams.get("class") || actor.classLabel || actor.assignedClasses[0] || "";
+    if (!isPortalViewer) requireClassAccess(actor, requestedClass);
     const query = isPortalViewer
       ? db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records WHERE nis = ? ORDER BY date DESC, created_at DESC").bind(actor.studentNis)
-      : db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records ORDER BY date DESC, created_at DESC");
+      : db.prepare("SELECT d.id, d.nis, d.type, d.title, d.detail, d.date, d.points FROM development_records d JOIN students s ON s.nis=d.nis WHERE s.class_label=? ORDER BY d.date DESC, d.created_at DESC").bind(requestedClass);
     const result = await query.all();
     return Response.json({ records: result.results.map(rowToRecord) });
   } catch (error) {
@@ -79,6 +81,9 @@ export async function POST(request: Request) {
     };
     const db = await ensureDatabase();
     await prepareDatabase(db);
+    const student = await db.prepare("SELECT class_label AS classLabel FROM students WHERE nis=?").bind(record.nis).first<{ classLabel: string }>();
+    if (!student) return Response.json({ error: "Siswa tidak ditemukan." }, { status: 404 });
+    requireClassAccess(actor, student.classLabel);
     await db.prepare("INSERT INTO development_records (id, nis, type, title, detail, date, points) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .bind(record.id, record.nis, record.type, record.title, record.detail, record.date, record.points).run();
     await audit(db, actor, "CREATE", "development_record", record.id, record.title);
@@ -97,6 +102,9 @@ export async function DELETE(request: Request) {
     if (!id) return Response.json({ error: "ID catatan wajib diisi." }, { status: 400 });
     const db = await ensureDatabase();
     await prepareDatabase(db);
+    const record = await db.prepare("SELECT s.class_label AS classLabel FROM development_records d JOIN students s ON s.nis=d.nis WHERE d.id=?").bind(id).first<{ classLabel: string }>();
+    if (!record) return Response.json({ error: "Catatan tidak ditemukan." }, { status: 404 });
+    requireClassAccess(actor, record.classLabel);
     const result = await db.prepare("DELETE FROM development_records WHERE id = ?").bind(id).run();
     if (!result.meta.changes) return Response.json({ error: "Catatan tidak ditemukan." }, { status: 404 });
     await audit(db, actor, "DELETE", "development_record", id, "Catatan rekam jejak dihapus");

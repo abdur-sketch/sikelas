@@ -1,10 +1,14 @@
 import { env } from "cloudflare:workers";
 
 export type UserRole = "Admin" | "Wali Kelas" | "Guru" | "Siswa" | "Wali Santri";
-export type AppActor = { email: string; name: string; role: UserRole; classLabel: string | null; studentNis: string | null };
+export type AppActor = { email: string; name: string; role: UserRole; classLabel: string | null; studentNis: string | null; status: string; active: number; assignedClasses: string[] };
+const PRIMARY_ADMIN_EMAIL = "baikganteng88@gmail.com";
 
 const ddl = [
-  "CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, class_label TEXT, student_nis TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, class_label TEXT, student_nis TEXT, status TEXT NOT NULL DEFAULT 'Pending', active INTEGER NOT NULL DEFAULT 0, approved_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE TABLE IF NOT EXISTS user_class_assignments (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, class_label TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS user_class_assignment_idx ON user_class_assignments (email, class_label)",
+  "CREATE INDEX IF NOT EXISTS user_class_email_idx ON user_class_assignments (email)",
   "CREATE TABLE IF NOT EXISTS classes (id TEXT PRIMARY KEY NOT NULL, label TEXT NOT NULL UNIQUE, short TEXT NOT NULL, boys INTEGER NOT NULL, girls INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS students (nis TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, class_label TEXT NOT NULL, gender TEXT NOT NULL, guardian TEXT NOT NULL, status TEXT NOT NULL, initials TEXT NOT NULL, color TEXT NOT NULL, barcode_token TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS students_class_idx ON students (class_label)",
@@ -60,9 +64,16 @@ export async function ensureDatabase(db = getD1()) {
     if (!existingPortfolioColumns.has(name)) await db.prepare(`ALTER TABLE portfolios ADD COLUMN ${name} ${type}`).run();
   }
   const userColumns = await db.prepare("PRAGMA table_info(users)").all<{ name: string }>();
-  if (!userColumns.results.some((column) => column.name === "student_nis")) await db.prepare("ALTER TABLE users ADD COLUMN student_nis TEXT").run();
+  const existingUserColumns = new Set(userColumns.results.map((column) => column.name));
+  for (const [name, definition] of [["student_nis","TEXT"],["status","TEXT NOT NULL DEFAULT 'Pending'"],["active","INTEGER NOT NULL DEFAULT 0"],["approved_by","TEXT"],["updated_at","TEXT"]] as const) {
+    if (!existingUserColumns.has(name)) await db.prepare(`ALTER TABLE users ADD COLUMN ${name} ${definition}`).run();
+  }
   await db.batch([
-    db.prepare("INSERT OR IGNORE INTO users (email,name,role,class_label) VALUES (?,?,?,?)").bind("guru@nuruliman.sch.id","Abdurohman Yusuf","Wali Kelas","XI DKV 1"),
+    db.prepare("INSERT OR IGNORE INTO users (email,name,role,class_label,status,active,approved_by) VALUES (?,?,?,?,'Active',1,?)").bind("guru@nuruliman.sch.id","Abdurohman Yusuf","Wali Kelas","XI DKV 1",PRIMARY_ADMIN_EMAIL),
+    db.prepare("UPDATE users SET role='Wali Kelas',class_label='XI DKV 1',status='Active',active=1,approved_by=?,updated_at=CURRENT_TIMESTAMP WHERE email='guru@nuruliman.sch.id'").bind(PRIMARY_ADMIN_EMAIL),
+    db.prepare("INSERT OR IGNORE INTO users (email,name,role,status,active,approved_by) VALUES (?,?,?,'Active',1,?)").bind(PRIMARY_ADMIN_EMAIL,"Abdurohman Yusuf","Admin",PRIMARY_ADMIN_EMAIL),
+    db.prepare("UPDATE users SET name='Abdurohman Yusuf',role='Admin',status='Active',active=1,approved_by=?,updated_at=CURRENT_TIMESTAMP WHERE email=?").bind(PRIMARY_ADMIN_EMAIL,PRIMARY_ADMIN_EMAIL),
+    db.prepare("INSERT OR IGNORE INTO user_class_assignments (id,email,class_label) VALUES (?,?,?)").bind("assign-seed-wali-xi","guru@nuruliman.sch.id","XI DKV 1"),
     ...[["x","X DKV 1","X",3,3],["xi","XI DKV 1","XI",0,6],["xii","XII DKV 1","XII",3,3]].map((c) => db.prepare("INSERT OR IGNORE INTO classes (id,label,short,boys,girls) VALUES (?,?,?,?,?)").bind(...c)),
     ...studentSeed.map((s) => db.prepare("INSERT OR IGNORE INTO students (nis,name,class_label,gender,guardian,status,initials,color,barcode_token) VALUES (?,?,?,?,?,'Aktif',?,?,?)").bind(...s, `NI-${s[0]}-2026`)),
     ...[["t1","Poster Hari Kemerdekaan","XI DKV 1","Desain Grafis","2026-07-16",5,6,"Berjalan","green"],["t2","Foto Produk Lokal","XI DKV 1","Fotografi","2026-07-18",4,6,"Berjalan","gold"],["t3","Esai Budaya Pesantren","XI DKV 1","Bahasa Indonesia","2026-07-20",2,6,"Baru","blue"],["t4","Animasi Logo Sekolah","XI DKV 1","Animasi Dasar","2026-07-11",6,6,"Selesai","purple"]].map((t) => db.prepare("INSERT OR IGNORE INTO tasks (id,title,class_label,subject,due,submitted,total,status,tone) VALUES (?,?,?,?,?,?,?,?,?)").bind(...t)),
@@ -81,15 +92,19 @@ export async function ensureDatabase(db = getD1()) {
 }
 
 export async function getActor(request: Request): Promise<AppActor> {
-  const email = request.headers.get("oai-authenticated-user-email") || (new URL(request.url).hostname === "localhost" ? "guru@nuruliman.sch.id" : "");
+  const email = (request.headers.get("oai-authenticated-user-email") || (new URL(request.url).hostname === "localhost" ? "guru@nuruliman.sch.id" : "")).trim().toLowerCase();
   if (!email) throw new Error("Sesi pengguna tidak tersedia.");
   const db = await ensureDatabase();
-  const user = await db.prepare("SELECT email,name,role,class_label AS classLabel,student_nis AS studentNis FROM users WHERE email=?").bind(email).first<AppActor>();
-  if (user) return user;
+  const user = await db.prepare("SELECT email,name,role,class_label AS classLabel,student_nis AS studentNis,status,active FROM users WHERE email=?").bind(email).first<Omit<AppActor,"assignedClasses">>();
+  if (user) {
+    if (!Number(user.active) || user.status !== "Active") throw new Error(user.status === "Pending" ? "Akun menunggu persetujuan Admin Pusat." : "Akun Anda sedang dinonaktifkan.");
+    const assignments = await db.prepare("SELECT class_label AS classLabel FROM user_class_assignments WHERE email=? ORDER BY class_label").bind(email).all<{classLabel:string}>();
+    return { ...user, active:Number(user.active), assignedClasses:assignments.results.map((item)=>item.classLabel) };
+  }
   const nameHeader = request.headers.get("oai-authenticated-user-full-name");
   const name = nameHeader ? decodeURIComponent(nameHeader) : email.split("@")[0];
-  await db.prepare("INSERT INTO users (email,name,role,class_label) VALUES (?,?,'Guru',NULL)").bind(email,name).run();
-  return { email, name, role: "Guru", classLabel: null, studentNis: null };
+  await db.prepare("INSERT INTO users (email,name,role,class_label,status,active) VALUES (?,?,'Guru',NULL,'Pending',0)").bind(email,name).run();
+  throw new Error("Akun menunggu persetujuan Admin Pusat.");
 }
 
 export async function audit(db: D1Database, actor: AppActor, action: string, entity: string, entityId: string, detail: string) {
@@ -98,4 +113,14 @@ export async function audit(db: D1Database, actor: AppActor, action: string, ent
 
 export function requireWriteRole(actor: AppActor) {
   if (!["Admin","Wali Kelas","Guru"].includes(actor.role)) throw new Error("Anda tidak memiliki izin untuk mengubah data.");
+}
+
+export function requireAdmin(actor: AppActor) {
+  if (actor.role !== "Admin") throw new Error("Operasi ini hanya dapat dilakukan Admin Pusat.");
+}
+
+export function requireClassAccess(actor: AppActor, classLabel: string) {
+  if (actor.role === "Admin") return;
+  const allowed = new Set([actor.classLabel, ...actor.assignedClasses].filter(Boolean));
+  if (!classLabel || !allowed.has(classLabel)) throw new Error("Anda tidak ditugaskan pada kelas ini.");
 }
