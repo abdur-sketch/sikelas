@@ -29,9 +29,10 @@ test("build emits the SIKELAS dashboard and persistent API routes", async () => 
 });
 
 test("keeps product metadata and removes starter dependencies", async () => {
-  const [page, layout, packageJson, hosting, schema, runtime, api, uploadApi, fileApi] = await Promise.all([
+  const [page, layout, styles, packageJson, hosting, schema, runtime, api, uploadApi, fileApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
@@ -70,6 +71,10 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /aria-controls="class-menu"/);
   assert.match(page, /closeOutside/);
   assert.match(page, /closeWithEscape/);
+  assert.match(styles, /--control-h:42px/);
+  assert.match(styles, /--control-sm:36px/);
+  assert.match(styles, /\.class-selector \{ width:100%;min-height:64px;margin:0/);
+  assert.match(styles, /\.menu-button \{ display:grid; \}/);
   assert.match(page, /Keluar dari akun/);
   assert.match(page, /Pengaturan akun/);
   assert.match(page, /api\/development-records/);
