@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("build emits the SIKELAS dashboard and persistent API route", async () => {
-  const [page, layout, worker] = await Promise.all([
+test("build emits the SIKELAS dashboard and persistent API routes", async () => {
+  const [page, layout, worker, weatherApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/weather/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /SIKELAS Nurul Iman/i);
   assert.match(page, /Assalamu.alaikum, Ust\. Abdurohman Yusuf!/i);
@@ -15,9 +16,15 @@ test("build emits the SIKELAS dashboard and persistent API route", async () => {
   assert.match(page, /Rekam Jejak/i);
   assert.match(worker, /api\/development-records/i);
   assert.match(worker, /api\/sikelas/i);
+  assert.match(worker, /api\/weather/i);
   assert.match(worker, /CREATE TABLE IF NOT EXISTS development_records/i);
   assert.match(worker, /CREATE TABLE IF NOT EXISTS attendance_records/i);
   assert.match(worker, /CREATE TABLE IF NOT EXISTS audit_logs/i);
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS academic_periods/i);
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS task_submissions/i);
+  assert.match(weatherApi, /-5\.3827/);
+  assert.match(weatherApi, /105\.0955/);
+  assert.match(weatherApi, /Pesawaran, Lampung/);
   assert.doesNotMatch(page + layout, /codex-preview|Your site is taking shape/i);
 });
 
@@ -45,6 +52,13 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /function PortfolioPage/);
   assert.match(page, /function SettingsPage/);
   assert.match(page, /function StudentDevelopmentPage/);
+  assert.match(page, /function AdministrationPage/);
+  assert.match(page, /Buka Semester Baru/);
+  assert.match(page, /Rekap Absensi/);
+  assert.match(page, /Portal Siswa/);
+  assert.match(page, /Impor CSV/);
+  assert.match(page, /Pemulihan/);
+  assert.match(page, /Pesawaran, Lampung/);
   assert.match(page, /Laporan Semester/);
   assert.match(page, /Poin Pelanggaran/);
   assert.match(page, /profile-popover/);
@@ -61,12 +75,21 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(schema, /schedules/);
   assert.match(schema, /grades/);
   assert.match(schema, /settings/);
+  assert.match(schema, /academic_periods/);
+  assert.match(schema, /task_submissions/);
+  assert.match(schema, /communication_logs/);
+  assert.match(schema, /deleted_records/);
   assert.match(runtime, /oai-authenticated-user-email/);
+  assert.match(runtime, /student_nis/);
   assert.match(runtime, /requireWriteRole/);
   assert.match(api, /Barcode tidak sah/);
   assert.match(api, /notificationRead/);
   assert.match(api, /barcodeRegenerate/);
   assert.match(api, /todayJakarta/);
+  assert.match(api, /accountMapping/);
+  assert.match(api, /promoteStudents/);
+  assert.match(api, /portfolioApproval/);
+  assert.match(api, /resource==="restore"/);
   assert.doesNotMatch(api, /date=\?[^\n]*2026-07-15/);
   assert.match(uploadApi, /10 \* 1024 \* 1024/);
   assert.match(uploadApi, /getR2/);

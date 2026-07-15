@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
-  email: text("email").primaryKey(), name: text("name").notNull(), role: text("role").notNull(), classLabel: text("class_label"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  email: text("email").primaryKey(), name: text("name").notNull(), role: text("role").notNull(), classLabel: text("class_label"), studentNis: text("student_nis"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const classes = sqliteTable("classes", {
@@ -28,6 +28,22 @@ export const schedulesTable = sqliteTable("schedules", {
 export const gradesTable = sqliteTable("grades", {
   id: text("id").primaryKey(), nis: text("nis").notNull(), classLabel: text("class_label").notNull(), assignment: integer("assignment").notNull(), practice: integer("practice").notNull(), exam: integer("exam").notNull(), attitude: text("attitude").notNull(), finalScore: integer("final_score").notNull(),
 }, (table) => [uniqueIndex("grades_student_class_idx").on(table.nis, table.classLabel)]);
+
+export const academicPeriods = sqliteTable("academic_periods", {
+  id: text("id").primaryKey(), label: text("label").notNull(), semester: text("semester").notNull(), startDate: text("start_date").notNull(), endDate: text("end_date").notNull(), active: integer("active", { mode: "boolean" }).notNull().default(false), closedAt: text("closed_at"),
+});
+
+export const taskSubmissions = sqliteTable("task_submissions", {
+  id: text("id").primaryKey(), taskId: text("task_id").notNull(), nis: text("nis").notNull(), status: text("status").notNull(), score: integer("score"), feedback: text("feedback").notNull().default(""), evidenceUrl: text("evidence_url"), submittedAt: text("submitted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex("submissions_task_student_idx").on(table.taskId, table.nis)]);
+
+export const communicationLogs = sqliteTable("communication_logs", {
+  id: text("id").primaryKey(), nis: text("nis").notNull(), channel: text("channel").notNull(), message: text("message").notNull(), status: text("status").notNull(), actorEmail: text("actor_email").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("communication_nis_idx").on(table.nis)]);
+
+export const deletedRecords = sqliteTable("deleted_records", {
+  id: text("id").primaryKey(), entity: text("entity").notNull(), entityId: text("entity_id").notNull(), payload: text("payload").notNull(), deletedBy: text("deleted_by").notNull(), deletedAt: text("deleted_at").notNull().default(sql`CURRENT_TIMESTAMP`), restoredAt: text("restored_at"),
+}, (table) => [index("deleted_entity_idx").on(table.entity)]);
 
 export const settingsTable = sqliteTable("settings", {
   classLabel: text("class_label").primaryKey(), schoolName: text("school_name").notNull(), npsn: text("npsn").notNull(), schoolEmail: text("school_email").notNull(), phone: text("phone").notNull(), address: text("address").notNull(), homeroom: text("homeroom").notNull(), academicYear: text("academic_year").notNull(), room: text("room").notNull(), entryTime: text("entry_time").notNull(), lateTime: text("late_time").notNull(), endTime: text("end_time").notNull(), minAttendance: integer("min_attendance").notNull(), assignmentWeight: integer("assignment_weight").notNull(), practiceWeight: integer("practice_weight").notNull(), examWeight: integer("exam_weight").notNull(), attitudeWeight: integer("attitude_weight").notNull(), kkm: integer("kkm").notNull(),

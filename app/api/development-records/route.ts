@@ -41,10 +41,17 @@ function rowToRecord(row: Record<string, unknown>): DevelopmentRecord {
 
 export async function GET(request: Request) {
   try {
-    await getActor(request);
+    const actor = await getActor(request);
     const db = await ensureDatabase();
     await prepareDatabase(db);
-    const result = await db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records ORDER BY date DESC, created_at DESC").all();
+    const isPortalViewer = actor.role === "Siswa" || actor.role === "Wali Santri";
+    if (isPortalViewer && !actor.studentNis) {
+      return Response.json({ error: "Akun portal belum terhubung dengan siswa." }, { status: 403 });
+    }
+    const query = isPortalViewer
+      ? db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records WHERE nis = ? ORDER BY date DESC, created_at DESC").bind(actor.studentNis)
+      : db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records ORDER BY date DESC, created_at DESC");
+    const result = await query.all();
     return Response.json({ records: result.results.map(rowToRecord) });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Gagal membaca rekam jejak." }, { status: 500 });
