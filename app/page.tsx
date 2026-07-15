@@ -516,6 +516,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
   const [activeClass, setActiveClass] = useState<(typeof classOptions)[number]>(classOptions[1]);
   const [classMenuOpen, setClassMenuOpen] = useState(false);
   const [appData, setAppData] = useState<BootstrapData | null>(null);
@@ -553,7 +554,17 @@ export default function Home() {
         </div>
         <nav aria-label="Menu utama"><small>MENU UTAMA</small>{navItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "tugas" && <i>3</i>}</button>)}</nav>
         <nav className="secondary-nav" aria-label="Menu lainnya"><small>LAINNYA</small>{secondaryNavItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "pengumuman" && <i>3</i>}</button>)}</nav>
-        <div className="sidebar-footer"><button className="user-card"><span className="avatar teacher">{actorInitials}</span><span><strong>{actorName}</strong><small>{appData?.actor.role ?? "Guru"}</small></span><i>•••</i></button><button className="logout" onClick={() => { window.location.href = "/signout-with-chatgpt?return_to=/"; }}>↪ Keluar</button></div>
+        <div className="sidebar-footer">
+          <button className={sidebarProfileOpen ? "user-card active" : "user-card"} onClick={() => setSidebarProfileOpen((value) => !value)} aria-expanded={sidebarProfileOpen} aria-haspopup="menu">
+            <span className="avatar teacher">{actorInitials}</span><span><strong>{actorName}</strong><small>{appData?.actor.role ?? "Guru"}</small></span><i>{sidebarProfileOpen ? "⌃" : "•••"}</i>
+          </button>
+          {sidebarProfileOpen && <div className="sidebar-profile-menu" role="menu">
+            <span><small>EMAIL AKUN</small><strong>{appData?.actor.email ?? "guru@nuruliman.sch.id"}</strong></span>
+            <span><small>KELAS AKTIF</small><strong>{activeClass.label}</strong></span>
+            <button role="menuitem" onClick={() => { setPage("pengaturan"); setSidebarProfileOpen(false); setMenuOpen(false); }}>⚙ Pengaturan akun</button>
+          </div>}
+          <button className="logout" onClick={() => { window.location.href = "/signout-with-chatgpt?return_to=/"; }}>↪ Keluar</button>
+        </div>
       </aside>
       {menuOpen && <button className="overlay" onClick={() => setMenuOpen(false)} aria-label="Tutup menu" />}
       <main className="main-content">
