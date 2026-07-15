@@ -1,0 +1,18 @@
+import { ensureDatabase, getActor, getR2 } from "../../../db/runtime";
+
+export async function GET(request: Request) {
+  try {
+    await getActor(request);
+    const key=new URL(request.url).searchParams.get("key")||"";
+    if (!key) return Response.json({error:"Berkas tidak ditemukan."},{status:404});
+    const db=await ensureDatabase();
+    const metadata=await db.prepare("SELECT evidence_name AS name,evidence_type AS type FROM portfolios WHERE evidence_key=?").bind(key).first<{name:string;type:string}>();
+    if (!metadata) return Response.json({error:"Berkas tidak terdaftar."},{status:404});
+    const object=await getR2().get(key);
+    if (!object) return Response.json({error:"Berkas tidak ditemukan."},{status:404});
+    const headers=new Headers({"content-type":metadata.type||"application/octet-stream","content-disposition":`inline; filename="${metadata.name.replaceAll('"','')}"`,"cache-control":"private, max-age=300","x-content-type-options":"nosniff"});
+    return new Response(object.body,{headers});
+  } catch (error) {
+    return Response.json({error:error instanceof Error?error.message:"Berkas tidak dapat dibuka."},{status:401});
+  }
+}

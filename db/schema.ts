@@ -21,12 +21,24 @@ export const tasksTable = sqliteTable("tasks", {
   id: text("id").primaryKey(), title: text("title").notNull(), classLabel: text("class_label").notNull(), subject: text("subject").notNull(), due: text("due").notNull(), submitted: integer("submitted").notNull(), total: integer("total").notNull(), status: text("status").notNull(), tone: text("tone").notNull(),
 }, (table) => [index("tasks_class_idx").on(table.classLabel)]);
 
+export const schedulesTable = sqliteTable("schedules", {
+  id: text("id").primaryKey(), classLabel: text("class_label").notNull(), day: text("day").notNull(), startTime: text("start_time").notNull(), subject: text("subject").notNull(), teacher: text("teacher").notNull(), room: text("room").notNull(), tone: text("tone").notNull(),
+}, (table) => [index("schedules_class_idx").on(table.classLabel)]);
+
+export const gradesTable = sqliteTable("grades", {
+  id: text("id").primaryKey(), nis: text("nis").notNull(), classLabel: text("class_label").notNull(), assignment: integer("assignment").notNull(), practice: integer("practice").notNull(), exam: integer("exam").notNull(), attitude: text("attitude").notNull(), finalScore: integer("final_score").notNull(),
+}, (table) => [uniqueIndex("grades_student_class_idx").on(table.nis, table.classLabel)]);
+
+export const settingsTable = sqliteTable("settings", {
+  classLabel: text("class_label").primaryKey(), schoolName: text("school_name").notNull(), npsn: text("npsn").notNull(), schoolEmail: text("school_email").notNull(), phone: text("phone").notNull(), address: text("address").notNull(), homeroom: text("homeroom").notNull(), academicYear: text("academic_year").notNull(), room: text("room").notNull(), entryTime: text("entry_time").notNull(), lateTime: text("late_time").notNull(), endTime: text("end_time").notNull(), minAttendance: integer("min_attendance").notNull(), assignmentWeight: integer("assignment_weight").notNull(), practiceWeight: integer("practice_weight").notNull(), examWeight: integer("exam_weight").notNull(), attitudeWeight: integer("attitude_weight").notNull(), kkm: integer("kkm").notNull(),
+});
+
 export const announcementsTable = sqliteTable("announcements", {
   id: text("id").primaryKey(), title: text("title").notNull(), category: text("category").notNull(), audience: text("audience").notNull(), date: text("date").notNull(), author: text("author").notNull(), priority: text("priority").notNull(), status: text("status").notNull(), excerpt: text("excerpt").notNull(),
 }, (table) => [index("announcements_audience_idx").on(table.audience)]);
 
 export const portfoliosTable = sqliteTable("portfolios", {
-  id: text("id").primaryKey(), title: text("title").notNull(), type: text("type").notNull(), nis: text("nis").notNull(), student: text("student").notNull(), classLabel: text("class_label").notNull(), date: text("date").notNull(), status: text("status").notNull(), score: integer("score").notNull(), tone: text("tone").notNull(), description: text("description").notNull().default(""),
+  id: text("id").primaryKey(), title: text("title").notNull(), type: text("type").notNull(), nis: text("nis").notNull(), student: text("student").notNull(), classLabel: text("class_label").notNull(), date: text("date").notNull(), status: text("status").notNull(), score: integer("score").notNull(), tone: text("tone").notNull(), description: text("description").notNull().default(""), evidenceKey: text("evidence_key"), evidenceName: text("evidence_name"), evidenceType: text("evidence_type"), evidenceUrl: text("evidence_url"),
 }, (table) => [index("portfolios_class_idx").on(table.classLabel), index("portfolios_nis_idx").on(table.nis)]);
 
 export const pointRules = sqliteTable("point_rules", {

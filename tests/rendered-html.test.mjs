@@ -22,7 +22,7 @@ test("build emits the SIKELAS dashboard and persistent API route", async () => {
 });
 
 test("keeps product metadata and removes starter dependencies", async () => {
-  const [page, layout, packageJson, hosting, schema, runtime, api] = await Promise.all([
+  const [page, layout, packageJson, hosting, schema, runtime, api, uploadApi, fileApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -30,6 +30,8 @@ test("keeps product metadata and removes starter dependencies", async () => {
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/runtime.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/sikelas/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/portfolio-upload/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/portfolio-file/route.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /title:\s*"SIKELAS Nurul Iman"/);
@@ -52,13 +54,23 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Pengaturan akun/);
   assert.match(page, /api\/development-records/);
   assert.match(hosting, /"d1":\s*"DB"/);
+  assert.match(hosting, /"r2":\s*"FILES"/);
   assert.match(schema, /development_records/);
   assert.match(schema, /attendance_records/);
   assert.match(schema, /audit_logs/);
+  assert.match(schema, /schedules/);
+  assert.match(schema, /grades/);
+  assert.match(schema, /settings/);
   assert.match(runtime, /oai-authenticated-user-email/);
   assert.match(runtime, /requireWriteRole/);
   assert.match(api, /Barcode tidak sah/);
   assert.match(api, /notificationRead/);
+  assert.match(api, /barcodeRegenerate/);
+  assert.match(api, /todayJakarta/);
+  assert.doesNotMatch(api, /date=\?[^\n]*2026-07-15/);
+  assert.match(uploadApi, /10 \* 1024 \* 1024/);
+  assert.match(uploadApi, /getR2/);
+  assert.match(fileApi, /x-content-type-options/);
   assert.match(page, /function BarcodeScanner/);
   assert.match(page, /BrowserMultiFormatReader/);
   assert.match(page, /Scan Barcode/);
@@ -69,6 +81,10 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Aturan Poin & Riwayat Perubahan/);
   assert.match(page, /Unduh Kartu Barcode/);
   assert.match(page, /Unduh Rekap/);
+  assert.match(page, /Regenerasi Barcode/);
+  assert.match(page, /Tambah Jadwal/);
+  assert.match(page, /Tambah Tugas/);
+  assert.match(page, /Berkas bukti/);
   assert.match(page, /signout-with-chatgpt/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout, /codex-preview|_sites-preview|SkeletonPreview/);
