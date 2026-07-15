@@ -1,13 +1,8 @@
-import { env } from "cloudflare:workers";
 import { initialDevelopmentRecords } from "../../development-records";
 import { normalizeDevelopmentPoints, type DevelopmentRecord, type DevelopmentType } from "../../student-points";
+import { audit, ensureDatabase, getActor, requireWriteRole } from "../../../db/runtime";
 
 const allowedTypes: DevelopmentType[] = ["Portofolio", "Prestasi", "Pelanggaran"];
-
-function getD1(): D1Database {
-  if (!env.DB) throw new Error("Database D1 belum tersedia.");
-  return env.DB;
-}
 
 async function prepareDatabase(db: D1Database) {
   await db.batch([
@@ -44,9 +39,10 @@ function rowToRecord(row: Record<string, unknown>): DevelopmentRecord {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const db = getD1();
+    await getActor(request);
+    const db = await ensureDatabase();
     await prepareDatabase(db);
     const result = await db.prepare("SELECT id, nis, type, title, detail, date, points FROM development_records ORDER BY date DESC, created_at DESC").all();
     return Response.json({ records: result.results.map(rowToRecord) });
@@ -57,6 +53,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const actor = await getActor(request);
+    requireWriteRole(actor);
     const body = await request.json() as Partial<DevelopmentRecord>;
     const type = body.type as DevelopmentType;
     if (!body.nis?.trim() || !body.title?.trim() || !body.date || !allowedTypes.includes(type)) {
@@ -72,10 +70,12 @@ export async function POST(request: Request) {
       date: body.date,
       points: normalizeDevelopmentPoints(type, Number(body.points ?? 0)),
     };
-    const db = getD1();
+    const db = await ensureDatabase();
     await prepareDatabase(db);
     await db.prepare("INSERT INTO development_records (id, nis, type, title, detail, date, points) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .bind(record.id, record.nis, record.type, record.title, record.detail, record.date, record.points).run();
+    await audit(db, actor, "CREATE", "development_record", record.id, record.title);
+    await db.prepare("INSERT INTO notifications (id,user_email,title,message,read) VALUES (?,?,?, ?,0)").bind(crypto.randomUUID(), actor.email, `${record.type} siswa`, `${record.nis}: ${record.title} (${record.points > 0 ? "+" : ""}${record.points} poin)`).run();
     return Response.json({ record }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Gagal menyimpan catatan." }, { status: 500 });
@@ -84,12 +84,15 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const actor = await getActor(request);
+    requireWriteRole(actor);
     const id = new URL(request.url).searchParams.get("id")?.trim();
     if (!id) return Response.json({ error: "ID catatan wajib diisi." }, { status: 400 });
-    const db = getD1();
+    const db = await ensureDatabase();
     await prepareDatabase(db);
     const result = await db.prepare("DELETE FROM development_records WHERE id = ?").bind(id).run();
     if (!result.meta.changes) return Response.json({ error: "Catatan tidak ditemukan." }, { status: 404 });
+    await audit(db, actor, "DELETE", "development_record", id, "Catatan rekam jejak dihapus");
     return Response.json({ deleted: id });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Gagal menghapus catatan." }, { status: 500 });

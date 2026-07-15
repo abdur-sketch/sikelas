@@ -9,9 +9,9 @@ type PageKey = "dashboard" | "siswa" | "absensi" | "jadwal" | "tugas" | "perkemb
 type Attendance = "Hadir" | "Sakit" | "Izin" | "Alpa" | "Terlambat";
 
 const classOptions = [
-  { label: "X DKV 1", short: "X", students: 30, boys: 17, girls: 13, present: 28 },
-  { label: "XI DKV 1", short: "XI", students: 32, boys: 18, girls: 14, present: 29 },
-  { label: "XII DKV 1", short: "XII", students: 28, boys: 16, girls: 12, present: 27 },
+  { label: "X DKV 1", short: "X", students: 6, boys: 3, girls: 3, present: 5 },
+  { label: "XI DKV 1", short: "XI", students: 6, boys: 0, girls: 6, present: 5 },
+  { label: "XII DKV 1", short: "XII", students: 6, boys: 3, girls: 3, present: 5 },
 ] as const;
 
 const students = [
@@ -23,6 +23,10 @@ const students = [
   { name: "Jilan Afifah", nis: "231006", class: "XI DKV 1", gender: "P", guardian: "0819 2233 4455", status: "Aktif", initials: "JA", color: "pink" },
 ];
 
+type StudentRow = (typeof students)[number] & { classLabel?: string; barcodeValue?: string };
+type AppActor = { email: string; name: string; role: string; classLabel: string | null };
+type BootstrapData = { actor: AppActor; students: StudentRow[]; attendance: { nis: string; status: Attendance; method: string; scannedAt: string }[]; tasks: typeof tasks; announcements: typeof announcements; portfolios: typeof portfolioItems; pointRules: { id: string; type: string; label: string; points: number; active: number }[]; auditLogs: { id: string; actorEmail: string; action: string; entity: string; entityId: string; detail: string; createdAt: string }[]; notifications: { id: string; title: string; message: string; read: number; createdAt: string }[] };
+
 const schedule = [
   { time: "07.00 – 08.30", subject: "Desain Grafis", teacher: "Ust. Abdurohman Yusuf.", room: "Lab DKV", tone: "green" },
   { time: "08.30 – 10.00", subject: "Fotografi", teacher: "Bapak Riki Ardian Pratama", room: "Studio Foto", tone: "gold" },
@@ -31,10 +35,10 @@ const schedule = [
 ];
 
 const tasks = [
-  { title: "Poster Hari Kemerdekaan", subject: "Desain Grafis", due: "16 Jul 2026", submitted: 28, total: 32, status: "Berjalan", tone: "green" },
-  { title: "Foto Produk Lokal", subject: "Fotografi", due: "18 Jul 2026", submitted: 21, total: 32, status: "Berjalan", tone: "gold" },
-  { title: "Esai Budaya Pesantren", subject: "Bahasa Indonesia", due: "20 Jul 2026", submitted: 12, total: 32, status: "Baru", tone: "blue" },
-  { title: "Animasi Logo Sekolah", subject: "Animasi Dasar", due: "11 Jul 2026", submitted: 31, total: 32, status: "Selesai", tone: "purple" },
+  { title: "Poster Hari Kemerdekaan", subject: "Desain Grafis", due: "16 Jul 2026", submitted: 5, total: 6, status: "Berjalan", tone: "green" },
+  { title: "Foto Produk Lokal", subject: "Fotografi", due: "18 Jul 2026", submitted: 4, total: 6, status: "Berjalan", tone: "gold" },
+  { title: "Esai Budaya Pesantren", subject: "Bahasa Indonesia", due: "20 Jul 2026", submitted: 2, total: 6, status: "Baru", tone: "blue" },
+  { title: "Animasi Logo Sekolah", subject: "Animasi Dasar", due: "11 Jul 2026", submitted: 6, total: 6, status: "Selesai", tone: "purple" },
 ];
 
 const announcements = [
@@ -71,9 +75,9 @@ const secondaryNavItems: { key: PageKey; label: string; icon: string }[] = [
 ];
 
 const pageMeta: Record<PageKey, { eyebrow: string; title: string; subtitle: string }> = {
-  dashboard: { eyebrow: "Selasa, 14 Juli 2026", title: "Assalamu’alaikum, Ust. Abdurohman Yusuf!", subtitle: "Berikut ringkasan kegiatan kelas XI DKV 1 hari ini." },
+  dashboard: { eyebrow: "Rabu, 15 Juli 2026", title: "Assalamu’alaikum, Ust. Abdurohman Yusuf!", subtitle: "Berikut ringkasan kegiatan kelas XI DKV 1 hari ini." },
   siswa: { eyebrow: "Manajemen kelas", title: "Data Siswa", subtitle: "Kelola identitas dan status siswa XI DKV 1." },
-  absensi: { eyebrow: "Selasa, 14 Juli 2026", title: "Absensi Harian", subtitle: "Catat kehadiran siswa dengan cepat dan akurat." },
+  absensi: { eyebrow: "Rabu, 15 Juli 2026", title: "Absensi Harian", subtitle: "Catat kehadiran siswa dengan cepat dan akurat." },
   jadwal: { eyebrow: "Semester Ganjil 2026/2027", title: "Jadwal Pelajaran", subtitle: "Agenda belajar kelas XI DKV 1 selama satu pekan." },
   tugas: { eyebrow: "Pembelajaran", title: "Tugas & Nilai", subtitle: "Pantau pengumpulan tugas dan perkembangan nilai siswa." },
   perkembangan: { eyebrow: "Pembinaan siswa", title: "Rekam Jejak Siswa", subtitle: "Akumulasi portofolio, prestasi, pelanggaran, dan laporan akhir semester XI DKV 1." },
@@ -91,9 +95,22 @@ function Logo() {
   );
 }
 
-function Dashboard({ goTo, activeClass }: { goTo: (page: PageKey) => void; activeClass: (typeof classOptions)[number] }) {
-  const attendanceRate = Math.round((activeClass.present / activeClass.students) * 100);
-  const absentCount = activeClass.students - activeClass.present;
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function Dashboard({ goTo, activeClass, savedAttendance, taskRows }: { goTo: (page: PageKey) => void; activeClass: (typeof classOptions)[number]; savedAttendance: BootstrapData["attendance"]; taskRows: typeof tasks }) {
+  const presentCount = savedAttendance.filter((item) => item.status === "Hadir" || item.status === "Terlambat").length;
+  const attendanceRate = Math.round((presentCount / activeClass.students) * 100);
+  const sickCount = savedAttendance.filter((item) => item.status === "Sakit").length;
+  const permitCount = savedAttendance.filter((item) => item.status === "Izin").length;
+  const absentCount = savedAttendance.filter((item) => item.status === "Alpa").length;
+  const activeTasks = taskRows.filter((item) => item.status !== "Selesai").length;
 
   return (
     <>
@@ -105,10 +122,10 @@ function Dashboard({ goTo, activeClass }: { goTo: (page: PageKey) => void; activ
           <span className="stat-icon blue">□</span><span><small>Pelajaran Hari Ini</small><strong>4</strong><em>Sampai pukul 14.15</em></span>
         </button>
         <button className="stat-card" onClick={() => goTo("tugas")}>
-          <span className="stat-icon gold">✎</span><span><small>Tugas Aktif</small><strong>3</strong><em>1 segera berakhir</em></span>
+          <span className="stat-icon gold">✎</span><span><small>Tugas Aktif</small><strong>{activeTasks}</strong><em>Terhubung ke data kelas</em></span>
         </button>
         <button className="stat-card" onClick={() => goTo("absensi")}>
-          <span className="stat-icon purple">✓</span><span><small>Kehadiran Hari Ini</small><strong>{attendanceRate}%</strong><em className="positive">↑ 3% dari kemarin</em></span>
+          <span className="stat-icon purple">✓</span><span><small>Kehadiran Hari Ini</small><strong>{attendanceRate}%</strong><em>{savedAttendance.length} siswa sudah dicatat</em></span>
         </button>
       </section>
 
@@ -130,13 +147,13 @@ function Dashboard({ goTo, activeClass }: { goTo: (page: PageKey) => void; activ
         <article className="panel attendance-panel">
           <div className="panel-head"><div><p className="section-kicker">KEHADIRAN</p><h2>Absensi Hari Ini</h2></div><button className="icon-button" onClick={() => goTo("absensi")} aria-label="Buka absensi">→</button></div>
           <div className="donut-wrap">
-            <div className="donut"><div><strong>{activeClass.present}</strong><span>dari {activeClass.students} siswa</span></div></div>
+            <div className="donut"><div><strong>{presentCount}</strong><span>dari {activeClass.students} siswa</span></div></div>
           </div>
           <div className="legend">
-            <span><i className="legend-dot hadir"></i><b>{activeClass.present}</b> Hadir</span>
-            <span><i className="legend-dot sakit"></i><b>{Math.min(1, absentCount)}</b> Sakit</span>
-            <span><i className="legend-dot izin"></i><b>{Math.max(0, absentCount - 1)}</b> Izin</span>
-            <span><i className="legend-dot alpa"></i><b>0</b> Alpa</span>
+            <span><i className="legend-dot hadir"></i><b>{presentCount}</b> Hadir</span>
+            <span><i className="legend-dot sakit"></i><b>{sickCount}</b> Sakit</span>
+            <span><i className="legend-dot izin"></i><b>{permitCount}</b> Izin</span>
+            <span><i className="legend-dot alpa"></i><b>{absentCount}</b> Alpa</span>
           </div>
           <button className="primary-button wide" onClick={() => goTo("absensi")}>Isi Absensi Sekarang</button>
         </article>
@@ -146,7 +163,7 @@ function Dashboard({ goTo, activeClass }: { goTo: (page: PageKey) => void; activ
         <article className="panel tasks-panel">
           <div className="panel-head"><div><p className="section-kicker">PERLU DIPERHATIKAN</p><h2>Tugas Terdekat</h2></div><button className="text-button" onClick={() => goTo("tugas")}>Lihat semua <span>→</span></button></div>
           <div className="mini-tasks">
-            {tasks.slice(0, 3).map((task) => <div className="mini-task" key={task.title}><span className={`task-badge ${task.tone}`}>{task.subject.slice(0, 2).toUpperCase()}</span><div><strong>{task.title}</strong><span>{task.subject} · {Math.min(task.submitted, activeClass.students)}/{activeClass.students} terkumpul</span></div><time>{task.due}</time></div>)}
+            {taskRows.slice(0, 3).map((task) => <div className="mini-task" key={task.title}><span className={`task-badge ${task.tone}`}>{task.subject.slice(0, 2).toUpperCase()}</span><div><strong>{task.title}</strong><span>{task.subject} · {Math.min(task.submitted, activeClass.students)}/{activeClass.students} terkumpul</span></div><time>{task.due}</time></div>)}
           </div>
         </article>
         <article className="announcement-card">
@@ -160,15 +177,26 @@ function Dashboard({ goTo, activeClass }: { goTo: (page: PageKey) => void; activ
   );
 }
 
-function Students({ activeClass }: { activeClass: (typeof classOptions)[number] }) {
+function BarcodeCard({ student, onClose }: { student: StudentRow; onClose: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => { let cancelled=false; import("@zxing/library").then(({ BarcodeFormat, QRCodeWriter }) => { if(cancelled||!canvasRef.current||!student.barcodeValue)return; const matrix=new QRCodeWriter().encode(student.barcodeValue,BarcodeFormat.QR_CODE,240,240); const canvas=canvasRef.current; const context=canvas.getContext("2d"); if(!context)return; const image=context.createImageData(240,240); for(let y=0;y<240;y++)for(let x=0;x<240;x++){const offset=(y*240+x)*4;const color=matrix.get(x,y)?0:255;image.data.set([color,color,color,255],offset)} context.putImageData(image,0,0); }); return()=>{cancelled=true}; },[student.barcodeValue]);
+  const download=()=>{const link=document.createElement("a");link.download=`barcode-${student.nis}.png`;link.href=canvasRef.current?.toDataURL("image/png")??"";link.click()};
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`Kartu barcode ${student.name}`}><article className="barcode-card-modal"><button className="modal-close" onClick={onClose}>×</button><Logo/><p>SIKELAS NURUL IMAN</p><canvas ref={canvasRef} width="240" height="240"/><h2>{student.name}</h2><span>NIS {student.nis} · {student.classLabel ?? student.class}</span><small>Barcode unik dan terverifikasi sekolah</small><button className="primary-button wide" onClick={download}>Unduh Kartu Barcode</button></article></div>;
+}
+
+function Students({ activeClass, studentRows, refresh }: { activeClass: (typeof classOptions)[number]; studentRows: StudentRow[]; refresh: () => Promise<void> }) {
   const [query, setQuery] = useState("");
-  const filtered = students.filter((student) => student.name.toLowerCase().includes(query.toLowerCase()) || student.nis.includes(query));
+  const [adding,setAdding]=useState(false);
+  const [barcodeStudent,setBarcodeStudent]=useState<StudentRow|null>(null);
+  const filtered = studentRows.filter((student) => student.name.toLowerCase().includes(query.toLowerCase()) || student.nis.includes(query));
+  const addStudent=async(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const form=new FormData(event.currentTarget);await fetch("/api/sikelas",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({resource:"student",data:{nis:form.get("nis"),name:form.get("name"),gender:form.get("gender"),guardian:form.get("guardian"),classLabel:activeClass.label}})});setAdding(false);await refresh()};
   return (
-    <article className="panel data-panel">
-      <div className="toolbar"><label className="search-field"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari nama atau NIS..." /></label><div className="toolbar-actions"><button className="secondary-button">⇩ Ekspor</button><button className="primary-button">＋ Tambah Siswa</button></div></div>
-      <div className="table-scroll"><table><thead><tr><th>Siswa</th><th>NIS</th><th>Kelas</th><th>JK</th><th>Nomor Wali</th><th>Status</th><th></th></tr></thead><tbody>{filtered.map((student) => <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><strong>{student.name}</strong></div></td><td>{student.nis}</td><td><span className="class-chip">{activeClass.label}</span></td><td>{student.gender}</td><td>{student.guardian}</td><td><span className="status-chip active">● {student.status}</span></td><td><button className="more-button" aria-label={`Menu ${student.name}`}>•••</button></td></tr>)}</tbody></table></div>
+    <><article className="panel data-panel">
+      <div className="toolbar"><label className="search-field"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari nama atau NIS..." /></label><div className="toolbar-actions"><button className="secondary-button" onClick={()=>window.print()}>⇩ Ekspor</button><button className="primary-button" onClick={()=>setAdding(!adding)}>{adding?"Tutup Form":"＋ Tambah Siswa"}</button></div></div>
+      {adding&&<form className="inline-form" onSubmit={addStudent}><div className="form-grid"><label>Nama lengkap<input name="name" required/></label><label>NIS<input name="nis" required pattern="[0-9]{6}"/></label><label>Jenis kelamin<select name="gender"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></label><label>Nomor wali<input name="guardian" required/></label></div><div className="form-actions"><button className="primary-button" type="submit">Simpan Siswa</button></div></form>}
+      <div className="table-scroll"><table><thead><tr><th>Siswa</th><th>NIS</th><th>Kelas</th><th>JK</th><th>Nomor Wali</th><th>Status</th><th></th></tr></thead><tbody>{filtered.map((student) => <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><strong>{student.name}</strong></div></td><td>{student.nis}</td><td><span className="class-chip">{activeClass.label}</span></td><td>{student.gender}</td><td>{student.guardian}</td><td><span className="status-chip active">● {student.status}</span></td><td><button className="secondary-button" onClick={()=>setBarcodeStudent(student)}>▦ Barcode</button></td></tr>)}</tbody></table></div>
       <div className="table-footer"><span>Menampilkan {filtered.length} dari {activeClass.students} siswa</span><div><button disabled>←</button><button className="current">1</button><button>2</button><button>3</button><button>→</button></div></div>
-    </article>
+    </article>{barcodeStudent&&<BarcodeCard student={barcodeStudent} onClose={()=>setBarcodeStudent(null)}/>}</>
   );
 }
 
@@ -246,29 +274,38 @@ function BarcodeScanner({ onDetected }: { onDetected: (code: string) => void }) 
   </div>;
 }
 
-function AttendancePage({ activeClass }: { activeClass: string }) {
-  const [attendance, setAttendance] = useState<Record<string, Attendance>>(() => Object.fromEntries(students.map((student, index) => [student.nis, index === 3 ? "Sakit" : "Hadir"])));
+function AttendancePage({ activeClass, studentRows, savedAttendance }: { activeClass: string; studentRows: StudentRow[]; savedAttendance: BootstrapData["attendance"] }) {
+  const [attendance, setAttendance] = useState<Record<string, Attendance>>(() => Object.fromEntries(studentRows.map((student) => [student.nis, savedAttendance.find((item) => item.nis === student.nis)?.status ?? "Alpa"])));
   const [mode, setMode] = useState<"barcode" | "manual">("barcode");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [scanNotice, setScanNotice] = useState<{ type: "success" | "error" | "info"; message: string }>({ type: "info", message: "Gunakan barcode kartu siswa atau masukkan NIS untuk mencatat kehadiran." });
   const [scanHistory, setScanHistory] = useState<{ nis: string; name: string; time: string }[]>([]);
   const totals = useMemo(() => Object.values(attendance).reduce<Record<Attendance, number>>((result, status) => ({ ...result, [status]: result[status] + 1 }), { Hadir: 0, Sakit: 0, Izin: 0, Alpa: 0, Terlambat: 0 }), [attendance]);
 
-  const registerBarcode = useCallback((rawCode: string) => {
+  const saveAttendance = useCallback(async (nis: string, status: Attendance, method: "manual" | "barcode", rawCode = "") => {
+    const response = await fetch("/api/sikelas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ resource: "attendance", data: { nis, classLabel: activeClass, status, method, rawCode, date: "2026-07-15" } }) });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "Kehadiran gagal disimpan.");
+    setAttendance((current) => ({ ...current, [nis]: status }));
+  }, [activeClass]);
+
+  const registerBarcode = useCallback(async (rawCode: string, method: "manual" | "barcode" = "barcode") => {
     const normalizedCode = rawCode.trim();
-    const student = findStudentByBarcode(normalizedCode, students);
+    const student = findStudentByBarcode(normalizedCode, studentRows);
 
     if (!student) {
       setScanNotice({ type: "error", message: `Barcode “${normalizedCode || "kosong"}” tidak terdaftar pada ${activeClass}.` });
       return;
     }
 
-    const time = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
-    setAttendance((current) => ({ ...current, [student.nis]: "Hadir" }));
-    setScanHistory((current) => [{ nis: student.nis, name: student.name, time }, ...current.filter((item) => item.nis !== student.nis)].slice(0, 5));
-    setScanNotice({ type: "success", message: `${student.name} berhasil dicatat hadir pada ${time}.` });
-    setBarcodeInput("");
-  }, [activeClass]);
+    try {
+      await saveAttendance(student.nis, "Hadir", method, normalizedCode);
+      const time = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+      setScanHistory((current) => [{ nis: student.nis, name: student.name, time }, ...current.filter((item) => item.nis !== student.nis)].slice(0, 5));
+      setScanNotice({ type: "success", message: `${student.name} berhasil dicatat hadir pada ${time}.` });
+      setBarcodeInput("");
+    } catch (error) { setScanNotice({ type: "error", message: error instanceof Error ? error.message : "Barcode gagal diproses." }); }
+  }, [activeClass, saveAttendance, studentRows]);
 
   return (
     <>
@@ -277,7 +314,7 @@ function AttendancePage({ activeClass }: { activeClass: string }) {
       {mode === "barcode" && <section className="barcode-layout">
         <article className="panel scanner-panel">
           <BarcodeScanner onDetected={registerBarcode} />
-          <form className="barcode-entry" onSubmit={(event) => { event.preventDefault(); registerBarcode(barcodeInput); }}>
+          <form className="barcode-entry" onSubmit={(event) => { event.preventDefault(); registerBarcode(barcodeInput, "manual"); }}>
             <label htmlFor="barcode-code">Kode barcode / NIS</label>
             <div><input id="barcode-code" autoComplete="off" autoFocus value={barcodeInput} onChange={(event) => setBarcodeInput(event.target.value)} placeholder="Contoh: 231001" /><button className="primary-button" disabled={!barcodeInput.trim()} type="submit">Catat Kehadiran</button></div>
             <small>Tip: pembaca barcode USB dapat langsung mengetik kode di kolom ini lalu menekan Enter.</small>
@@ -287,14 +324,14 @@ function AttendancePage({ activeClass }: { activeClass: string }) {
         <aside className="panel scan-history">
           <div><p className="section-kicker">PEMINDAIAN TERBARU</p><h2>Riwayat Hari Ini</h2></div>
           {scanHistory.length ? <div className="history-list">{scanHistory.map((item) => <div key={item.nis}><span className="history-check">✓</span><span><strong>{item.name}</strong><small>NIS {item.nis}</small></span><time>{item.time}</time></div>)}</div> : <div className="history-empty"><span>▦</span><p>Belum ada barcode yang dipindai pada sesi ini.</p></div>}
-          <div className="barcode-guide"><strong>Isi barcode kartu siswa</strong><span>NIS enam digit, contoh: <b>231001</b></span></div>
+          <div className="barcode-guide"><strong>Barcode aman kartu siswa</strong><span>Format bertanda sekolah dan token unik siswa.</span></div>
         </aside>
       </section>}
       {mode === "manual" &&
       <article className="panel data-panel">
         <div className="toolbar"><div><h2>Kehadiran {activeClass}</h2><p className="muted">Jam pertama · Desain Grafis</p></div><button className="secondary-button">□ 14 Juli 2026</button></div>
-        <div className="attendance-rows">{students.map((student, index) => <div className="attendance-row" key={student.nis}><span className="row-number">{String(index + 1).padStart(2, "0")}</span><span className={`avatar ${student.color}`}>{student.initials}</span><div className="attendance-name"><strong>{student.name}</strong><span>{student.nis}</span></div><div className="attendance-options">{(["Hadir", "Sakit", "Izin", "Alpa", "Terlambat"] as Attendance[]).map((status) => <button className={attendance[student.nis] === status ? `selected ${status.toLowerCase()}` : ""} key={status} onClick={() => setAttendance({ ...attendance, [student.nis]: status })}>{status}</button>)}</div></div>)}</div>
-        <div className="sticky-action"><span>Perubahan tersimpan otomatis sebagai draf.</span><button className="primary-button" onClick={() => alert("Absensi berhasil disimpan.")}>Simpan Absensi</button></div>
+        <div className="attendance-rows">{studentRows.map((student, index) => <div className="attendance-row" key={student.nis}><span className="row-number">{String(index + 1).padStart(2, "0")}</span><span className={`avatar ${student.color}`}>{student.initials}</span><div className="attendance-name"><strong>{student.name}</strong><span>{student.nis}</span></div><div className="attendance-options">{(["Hadir", "Sakit", "Izin", "Alpa", "Terlambat"] as Attendance[]).map((status) => <button className={attendance[student.nis] === status ? `selected ${status.toLowerCase()}` : ""} key={status} onClick={() => saveAttendance(student.nis, status, "manual").catch((error) => setScanNotice({ type: "error", message: error.message }))}>{status}</button>)}</div></div>)}</div>
+        <div className="sticky-action"><span>Perubahan langsung tersimpan ke database dan audit log.</span><button className="primary-button" onClick={() => setMode("barcode")}>Buka Scan Barcode</button></div>
       </article>}
     </>
   );
@@ -312,48 +349,50 @@ function SchedulePage({ activeClass }: { activeClass: string }) {
   return <article className="panel week-panel"><div className="week-toolbar"><button className="secondary-button">← Minggu lalu</button><strong>13 – 17 Juli 2026</strong><button className="secondary-button">Minggu depan →</button></div><div className="week-grid">{days.map((day, dayIndex) => <section className={day === "Selasa" ? "today-column" : ""} key={day}><div className="day-head"><small>{day}</small><strong>{13 + dayIndex}</strong></div>{subjects[dayIndex].map((subject, index) => <div className={`subject-card tone-${(dayIndex + index) % 4}`} key={`${day}-${subject}-${index}`}><time>{["07.00", "08.30", "10.15", "12.45"][index]}</time><strong>{subject}</strong><span>{index % 2 ? "Lab DKV" : `Ruang ${activeClass}`}</span></div>)}</section>)}</div></article>;
 }
 
-function TasksPage({ activeClass }: { activeClass: (typeof classOptions)[number] }) {
+function TasksPage({ activeClass, studentRows, taskRows }: { activeClass: (typeof classOptions)[number]; studentRows: StudentRow[]; taskRows: typeof tasks }) {
   const [tab, setTab] = useState<"tugas" | "nilai">("tugas");
-  return <><div className="segmented"><button className={tab === "tugas" ? "active" : ""} onClick={() => setTab("tugas")}>Daftar Tugas</button><button className={tab === "nilai" ? "active" : ""} onClick={() => setTab("nilai")}>Rekap Nilai</button></div>{tab === "tugas" ? <section className="task-grid">{tasks.map((task) => { const submitted = Math.min(task.submitted, activeClass.students); return <article className="panel task-card" key={task.title}><div className="task-card-top"><span className={`task-badge large ${task.tone}`}>{task.subject.slice(0, 2).toUpperCase()}</span><span className={`status-chip ${task.status === "Selesai" ? "done" : "active"}`}>{task.status}</span></div><small>{task.subject} · {activeClass.label}</small><h2>{task.title}</h2><p>Batas pengumpulan <strong>{task.due}</strong></p><div className="progress-label"><span>Terkumpul</span><strong>{submitted}/{activeClass.students}</strong></div><div className="progress"><i style={{ width: `${(submitted / activeClass.students) * 100}%` }} /></div><button className="secondary-button wide">Lihat Pengumpulan</button></article>; })}</section> : <article className="panel data-panel"><div className="toolbar"><div><h2>Rekap Nilai {activeClass.label}</h2><p className="muted">Nilai akhir semester ganjil</p></div><button className="secondary-button">⇩ Unduh Rekap</button></div><div className="table-scroll"><table><thead><tr><th>Siswa</th><th>Tugas</th><th>Praktik</th><th>Ujian</th><th>Sikap</th><th>Nilai Akhir</th></tr></thead><tbody>{students.map((student, index) => { const score = 84 + (index % 5); return <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><strong>{student.name}</strong></div></td><td>{82 + index}</td><td>{88 - index}</td><td>{80 + index}</td><td><span className="grade-attitude">A</span></td><td><strong className="final-score">{score}</strong></td></tr>; })}</tbody></table></div></article>}</>;
+  return <><div className="segmented"><button className={tab === "tugas" ? "active" : ""} onClick={() => setTab("tugas")}>Daftar Tugas</button><button className={tab === "nilai" ? "active" : ""} onClick={() => setTab("nilai")}>Rekap Nilai</button></div>{tab === "tugas" ? <section className="task-grid">{taskRows.map((task) => { const submitted = Math.min(task.submitted, activeClass.students); return <article className="panel task-card" key={task.title}><div className="task-card-top"><span className={`task-badge large ${task.tone}`}>{task.subject.slice(0, 2).toUpperCase()}</span><span className={`status-chip ${task.status === "Selesai" ? "done" : "active"}`}>{task.status}</span></div><small>{task.subject} · {activeClass.label}</small><h2>{task.title}</h2><p>Batas pengumpulan <strong>{task.due}</strong></p><div className="progress-label"><span>Terkumpul</span><strong>{submitted}/{activeClass.students}</strong></div><div className="progress"><i style={{ width: `${(submitted / activeClass.students) * 100}%` }} /></div><button className="secondary-button wide">Lihat Pengumpulan</button></article>; })}</section> : <article className="panel data-panel"><div className="toolbar"><div><h2>Rekap Nilai {activeClass.label}</h2><p className="muted">Nilai akhir semester ganjil</p></div><button className="secondary-button" onClick={() => downloadCsv(`rekap-nilai-${activeClass.label}.csv`, [["NIS","Nama","Tugas","Praktik","Ujian","Sikap","Nilai Akhir"], ...studentRows.map((student,index) => [student.nis,student.name,82+index,88-index,80+index,"A",84+(index%5)])])}>⇩ Unduh Rekap</button></div><div className="table-scroll"><table><thead><tr><th>Siswa</th><th>Tugas</th><th>Praktik</th><th>Ujian</th><th>Sikap</th><th>Nilai Akhir</th></tr></thead><tbody>{studentRows.map((student, index) => { const score = 84 + (index % 5); return <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><strong>{student.name}</strong></div></td><td>{82 + index}</td><td>{88 - index}</td><td>{80 + index}</td><td><span className="grade-attitude">A</span></td><td><strong className="final-score">{score}</strong></td></tr>; })}</tbody></table></div></article>}</>;
 }
 
-function AnnouncementsPage({ activeClass }: { activeClass: string }) {
+function AnnouncementsPage({ activeClass, announcementRows, refresh }: { activeClass: string; announcementRows: typeof announcements; refresh: () => Promise<void> }) {
   const [filter, setFilter] = useState("Semua");
   const [composing, setComposing] = useState(false);
   const categories = ["Semua", "Akademik", "Kegiatan", "Pesantren", "Administrasi"];
-  const visible = announcements.filter((item) => (filter === "Semua" || item.category === filter) && (item.audience === "Semua Kelas" || item.audience === activeClass));
+  const visible = announcementRows.filter((item) => (filter === "Semua" || item.category === filter) && (item.audience === "Semua Kelas" || item.audience === activeClass));
+  const submitAnnouncement = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); await fetch("/api/sikelas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ resource: "announcement", data: { title: form.get("title"), category: form.get("category"), audience: form.get("audience"), date: form.get("date"), excerpt: form.get("excerpt"), status: "Draf" } }) }); setComposing(false); await refresh(); };
 
   return <>
-    <section className="module-stats"><div><span className="module-icon teal">☏</span><span><strong>{announcements.filter((item) => item.status === "Terbit").length}</strong><small>Sudah terbit</small></span></div><div><span className="module-icon orange">!</span><span><strong>{announcements.filter((item) => item.priority === "Penting").length}</strong><small>Prioritas penting</small></span></div><div><span className="module-icon blue">◎</span><span><strong>{visible.length}</strong><small>Untuk {activeClass}</small></span></div></section>
+    <section className="module-stats"><div><span className="module-icon teal">☏</span><span><strong>{announcementRows.filter((item) => item.status === "Terbit").length}</strong><small>Sudah terbit</small></span></div><div><span className="module-icon orange">!</span><span><strong>{announcementRows.filter((item) => item.priority === "Penting").length}</strong><small>Prioritas penting</small></span></div><div><span className="module-icon blue">◎</span><span><strong>{visible.length}</strong><small>Untuk {activeClass}</small></span></div></section>
     <article className="panel module-panel">
       <div className="toolbar"><div className="filter-row">{categories.map((category) => <button className={filter === category ? "active" : ""} key={category} onClick={() => setFilter(category)}>{category}</button>)}</div><button className="primary-button" onClick={() => setComposing(!composing)}>{composing ? "Tutup Form" : "＋ Buat Pengumuman"}</button></div>
-      {composing && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); setComposing(false); alert("Pengumuman berhasil disimpan sebagai draf."); }}><div className="form-grid"><label>Judul pengumuman<input required placeholder="Contoh: Jadwal kegiatan kelas" /></label><label>Kategori<select defaultValue="Akademik"><option>Akademik</option><option>Kegiatan</option><option>Pesantren</option><option>Administrasi</option><option>Perlengkapan</option></select></label><label>Sasaran<select defaultValue={activeClass}><option>Semua Kelas</option>{classOptions.map((item) => <option key={item.label}>{item.label}</option>)}</select></label><label>Tanggal terbit<input type="date" defaultValue="2026-07-15" /></label></div><label>Isi pengumuman<textarea required rows={4} placeholder="Tuliskan informasi secara lengkap..." /></label><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setComposing(false)}>Batal</button><button className="primary-button" type="submit">Simpan Draf</button></div></form>}
+      {composing && <form className="inline-form" onSubmit={submitAnnouncement}><div className="form-grid"><label>Judul pengumuman<input name="title" required placeholder="Contoh: Jadwal kegiatan kelas" /></label><label>Kategori<select name="category" defaultValue="Akademik"><option>Akademik</option><option>Kegiatan</option><option>Pesantren</option><option>Administrasi</option><option>Perlengkapan</option></select></label><label>Sasaran<select name="audience" defaultValue={activeClass}><option>Semua Kelas</option>{classOptions.map((item) => <option key={item.label}>{item.label}</option>)}</select></label><label>Tanggal terbit<input name="date" type="date" defaultValue="2026-07-15" /></label></div><label>Isi pengumuman<textarea name="excerpt" required rows={4} placeholder="Tuliskan informasi secara lengkap..." /></label><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setComposing(false)}>Batal</button><button className="primary-button" type="submit">Simpan Draf</button></div></form>}
       <div className="announcement-list">{visible.map((item) => <article className="announcement-item" key={item.title}><div className={`announcement-symbol ${item.category.toLowerCase()}`}>{item.category.slice(0, 2).toUpperCase()}</div><div className="announcement-body"><div className="announcement-meta"><span>{item.category}</span><i>•</i><span>{item.audience}</span><i>•</i><time>{item.date}</time></div><h2>{item.title}</h2><p>{item.excerpt}</p><small>Oleh {item.author}</small></div><div className="announcement-state"><span className={`priority ${item.priority.toLowerCase()}`}>{item.priority}</span><span className={`status-chip ${item.status === "Terbit" ? "active" : item.status === "Draf" ? "done" : ""}`}>{item.status}</span><button aria-label={`Menu ${item.title}`}>•••</button></div></article>)}</div>
       {visible.length === 0 && <div className="empty-state"><span>☏</span><strong>Belum ada pengumuman</strong><p>Tidak ada pengumuman dalam kategori ini untuk {activeClass}.</p></div>}
     </article>
   </>;
 }
 
-function PortfolioPage({ activeClass }: { activeClass: string }) {
+function PortfolioPage({ activeClass, studentRows, portfolioRows, refresh }: { activeClass: string; studentRows: StudentRow[]; portfolioRows: typeof portfolioItems; refresh: () => Promise<void> }) {
   const [filter, setFilter] = useState("Semua Karya");
   const [uploading, setUploading] = useState(false);
   const types = ["Semua Karya", "Desain Grafis", "Fotografi", "Video", "Animasi", "Website"];
-  const classWorks = portfolioItems.filter((item) => item.className === activeClass);
+  const classWorks = portfolioRows.filter((item) => item.className === activeClass);
   const visible = classWorks.filter((item) => filter === "Semua Karya" || item.type === filter);
+  const submitPortfolio = async (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const nis=String(form.get("nis")); const student=studentRows.find((item)=>item.nis===nis); if(!student) return; await fetch("/api/sikelas", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({resource:"portfolio",data:{title:form.get("title"),nis,student:student.name,type:form.get("type"),classLabel:activeClass,date:"2026-07-15",score:Number(form.get("score")),description:form.get("description")}})}); setUploading(false); await refresh(); };
 
   return <>
     <section className="portfolio-summary"><article className="panel"><strong>{classWorks.length}</strong><span>Total karya</span><i>◇</i></article><article className="panel"><strong>{classWorks.filter((item) => item.status === "Terpilih").length}</strong><span>Karya terpilih</span><i>★</i></article><article className="panel"><strong>{classWorks.length ? Math.round(classWorks.reduce((total, item) => total + item.score, 0) / classWorks.length) : 0}</strong><span>Rata-rata nilai</span><i>✓</i></article></section>
     <article className="panel module-panel"><div className="toolbar"><div className="filter-row">{types.map((type) => <button className={filter === type ? "active" : ""} key={type} onClick={() => setFilter(type)}>{type}</button>)}</div><button className="primary-button" onClick={() => setUploading(!uploading)}>{uploading ? "Tutup Form" : "＋ Tambah Karya"}</button></div>
-      {uploading && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); setUploading(false); alert("Karya berhasil disimpan dan menunggu peninjauan."); }}><div className="form-grid"><label>Judul karya<input required placeholder="Nama proyek atau karya" /></label><label>Nama siswa<select>{students.map((student) => <option key={student.nis}>{student.name}</option>)}</select></label><label>Jenis karya<select>{types.slice(1).map((type) => <option key={type}>{type}</option>)}</select></label><label>Kelas<input readOnly value={activeClass} /></label></div><label>Deskripsi karya<textarea rows={3} placeholder="Konsep, proses, dan perangkat yang digunakan..." /></label><div className="upload-zone"><span>⇧</span><div><strong>Pilih berkas karya</strong><small>JPG, PNG, PDF, MP4, atau tautan proyek · Maks. 20 MB</small></div><input aria-label="Unggah berkas karya" type="file" /></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setUploading(false)}>Batal</button><button className="primary-button" type="submit">Simpan Karya</button></div></form>}
+      {uploading && <form className="inline-form" onSubmit={submitPortfolio}><div className="form-grid"><label>Judul karya<input name="title" required placeholder="Nama proyek atau karya" /></label><label>Nama siswa<select name="nis">{studentRows.map((student) => <option value={student.nis} key={student.nis}>{student.name}</option>)}</select></label><label>Jenis karya<select name="type">{types.slice(1).map((type) => <option key={type}>{type}</option>)}</select></label><label>Nilai karya<input name="score" type="number" min="0" max="100" defaultValue="85" /></label></div><label>Deskripsi karya<textarea name="description" rows={3} placeholder="Konsep, proses, dan perangkat yang digunakan..." /></label><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setUploading(false)}>Batal</button><button className="primary-button" type="submit">Simpan & Tambah Poin</button></div></form>}
       <div className="portfolio-grid">{visible.map((item) => <article className="portfolio-card" key={item.title}><div className={`portfolio-cover ${item.tone}`}><span>{item.type === "Fotografi" ? "▣" : item.type === "Video" ? "▶" : item.type === "Website" ? "⌘" : "◇"}</span><small>{item.type}</small><b>{item.score}</b></div><div className="portfolio-info"><div><span className={`status-chip ${item.status === "Terpilih" || item.status === "Dipublikasi" ? "active" : "done"}`}>{item.status}</span><time>{item.date}</time></div><h2>{item.title}</h2><p>{item.student} · {item.className}</p><button className="secondary-button wide">Lihat Detail</button></div></article>)}</div>
       {visible.length === 0 && <div className="empty-state"><span>◇</span><strong>Belum ada karya</strong><p>Belum ada karya {filter === "Semua Karya" ? "" : filter.toLowerCase()} untuk {activeClass}.</p></div>}
     </article>
   </>;
 }
 
-function StudentDevelopmentPage({ activeClass }: { activeClass: string }) {
+function StudentDevelopmentPage({ activeClass, studentRows, pointRules, auditLogs, refresh }: { activeClass: string; studentRows: StudentRow[]; pointRules: BootstrapData["pointRules"]; auditLogs: BootstrapData["auditLogs"]; refresh: () => Promise<void> }) {
   const [records, setRecords] = useState<DevelopmentRecord[]>(initialDevelopmentRecords);
-  const [selectedNis, setSelectedNis] = useState(students[0].nis);
+  const [selectedNis, setSelectedNis] = useState(studentRows[0]?.nis ?? "");
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<"rekap" | "laporan">("rekap");
@@ -380,13 +419,14 @@ function StudentDevelopmentPage({ activeClass }: { activeClass: string }) {
       });
     return () => { cancelled = true; };
   }, []);
-  const selectedStudent = students.find((student) => student.nis === selectedNis) ?? students[0];
+  const selectedStudent = studentRows.find((student) => student.nis === selectedNis) ?? studentRows[0];
+  if (!selectedStudent) return <div className="empty-state"><strong>Belum ada siswa di kelas ini.</strong></div>;
   const selectedSummary = summarizeStudentPoints(selectedStudent.nis, records);
-  const summaries = students.map((student) => ({ student, summary: summarizeStudentPoints(student.nis, records) }));
+  const summaries = studentRows.map((student) => ({ student, summary: summarizeStudentPoints(student.nis, records) }));
   const filtered = summaries.filter(({ student }) => student.name.toLowerCase().includes(query.toLowerCase()) || student.nis.includes(query));
   const totalAchievements = records.filter((record) => record.type === "Prestasi").length;
   const totalViolations = records.filter((record) => record.type === "Pelanggaran").length;
-  const classAverage = Math.round(summaries.reduce((sum, item) => sum + item.summary.totalPoints, 0) / summaries.length);
+  const classAverage = summaries.length ? Math.round(summaries.reduce((sum, item) => sum + item.summary.totalPoints, 0) / summaries.length) : 0;
 
   const addRecord = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -436,14 +476,16 @@ function StudentDevelopmentPage({ activeClass }: { activeClass: string }) {
       setStorageMessage(error instanceof Error ? error.message : "Gagal menghapus catatan.");
     }
   };
+  const updatePointRule = async (id: string, points: number, active: boolean) => { await fetch("/api/sikelas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ resource: "pointRule", data: { id, points, active } }) }); await refresh(); };
 
   return <>
     <section className="development-stats"><article><span className="module-icon teal">◇</span><div><strong>{records.filter((record) => record.type === "Portofolio").length}</strong><small>Total portofolio</small></div></article><article><span className="module-icon blue">★</span><div><strong>{totalAchievements}</strong><small>Catatan prestasi</small></div></article><article><span className="module-icon orange">!</span><div><strong>{totalViolations}</strong><small>Catatan pelanggaran</small></div></article><article><span className="module-icon purple">∑</span><div><strong>{classAverage}</strong><small>Rata-rata poin kelas</small></div></article></section>
     <div className="storage-status-row"><span className={`storage-status ${storageState}`}><i>{storageState === "error" ? "!" : storageState === "loading" || storageState === "saving" ? "↻" : "✓"}</i>{storageMessage}</span></div>
+    <details className="panel governance-panel"><summary>Aturan Poin & Riwayat Perubahan</summary><div className="governance-grid"><section><h3>Aturan poin sekolah</h3>{pointRules.map((rule) => <label key={rule.id}><span><strong>{rule.label}</strong><small>{rule.type}</small></span><input aria-label={`Poin ${rule.label}`} type="number" defaultValue={rule.points} onBlur={(event) => updatePointRule(rule.id, Number(event.target.value), Boolean(rule.active))} /></label>)}</section><section><h3>Aktivitas terbaru</h3>{auditLogs.slice(0, 6).map((log) => <div className="audit-item" key={log.id}><span>{log.action}</span><div><strong>{log.detail}</strong><small>{log.actorEmail} · {new Date(log.createdAt).toLocaleString("id-ID")}</small></div></div>)}</section></div></details>
     <div className="development-actions"><div className="segmented"><button className={view === "rekap" ? "active" : ""} onClick={() => setView("rekap")}>Rekap Semua Siswa</button><button className={view === "laporan" ? "active" : ""} onClick={() => setView("laporan")}>Laporan Semester</button></div><button className="primary-button" disabled={storageState === "loading" || storageState === "saving"} onClick={() => setAdding((value) => !value)}>{adding ? "Tutup Form" : "＋ Tambah Catatan"}</button></div>
-    {adding && <form className="panel development-form" onSubmit={addRecord}><div className="form-grid"><label>Nama siswa<select name="nis" defaultValue={selectedNis}>{students.map((student) => <option value={student.nis} key={student.nis}>{student.name} · {student.nis}</option>)}</select></label><label>Jenis catatan<select name="type" defaultValue="Portofolio"><option>Portofolio</option><option>Prestasi</option><option>Pelanggaran</option></select></label><label>Judul catatan<input name="title" required placeholder="Contoh: Juara lomba desain" /></label><label>Tanggal<input name="date" type="date" required defaultValue="2026-07-15" /></label><label>Poin<input name="points" type="number" required min="1" defaultValue="10" /><small>Pelanggaran otomatis menjadi poin pengurang.</small></label><label>Keterangan<textarea name="detail" required rows={3} placeholder="Tuliskan keterangan dan bukti pendukung..." /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setAdding(false)}>Batal</button><button type="submit" className="primary-button">Simpan Catatan</button></div></form>}
+    {adding && <form className="panel development-form" onSubmit={addRecord}><div className="form-grid"><label>Nama siswa<select name="nis" defaultValue={selectedNis}>{studentRows.map((student) => <option value={student.nis} key={student.nis}>{student.name} · {student.nis}</option>)}</select></label><label>Jenis catatan<select name="type" defaultValue="Portofolio"><option>Portofolio</option><option>Prestasi</option><option>Pelanggaran</option></select></label><label>Judul catatan<input name="title" required placeholder="Contoh: Juara lomba desain" /></label><label>Tanggal<input name="date" type="date" required defaultValue="2026-07-15" /></label><label>Poin<input name="points" type="number" required min="1" defaultValue="10" /><small>Pelanggaran otomatis menjadi poin pengurang.</small></label><label>Keterangan<textarea name="detail" required rows={3} placeholder="Tuliskan keterangan dan bukti pendukung..." /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setAdding(false)}>Batal</button><button type="submit" className="primary-button">Simpan Catatan</button></div></form>}
     {view === "rekap" ? <article className="panel data-panel development-table"><div className="toolbar"><label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS..." /></label><span className="settings-tag">Semester Ganjil 2026/2027</span></div><div className="table-scroll"><table><thead><tr><th>Siswa</th><th>Portofolio</th><th>Poin Prestasi</th><th>Poin Pelanggaran</th><th>Total Poin</th><th>Predikat</th><th></th></tr></thead><tbody>{filtered.map(({ student, summary }) => <tr key={student.nis}><td><div className="student-name"><span className={`avatar ${student.color}`}>{student.initials}</span><span><strong>{student.name}</strong><small>{student.nis}</small></span></div></td><td><b>{summary.portfolioCount}</b> karya <small>+{summary.portfolioPoints} poin</small></td><td><span className="point positive">+{summary.achievementPoints}</span></td><td><span className="point negative">-{summary.violationPoints}</span></td><td><strong className="total-point">{summary.totalPoints}</strong></td><td><span className={`predicate ${summary.totalPoints < 20 ? "warning" : ""}`}>{getDevelopmentPredicate(summary.totalPoints)}</span></td><td><button className="secondary-button" onClick={() => { setSelectedNis(student.nis); setView("laporan"); }}>Lihat Laporan</button></td></tr>)}</tbody></table></div></article> : <article className="panel semester-report">
-      <div className="report-toolbar"><label>Pilih siswa<select value={selectedNis} onChange={(event) => setSelectedNis(event.target.value)}>{students.map((student) => <option value={student.nis} key={student.nis}>{student.name}</option>)}</select></label><button className="secondary-button" onClick={() => window.print()}>⎙ Cetak Laporan</button></div>
+      <div className="report-toolbar"><label>Pilih siswa<select value={selectedNis} onChange={(event) => setSelectedNis(event.target.value)}>{studentRows.map((student) => <option value={student.nis} key={student.nis}>{student.name}</option>)}</select></label><button className="secondary-button" onClick={() => window.print()}>⎙ Cetak Laporan</button></div>
       <header className="report-header"><div><Logo /><span><strong>SIKELAS NURUL IMAN</strong><small>Laporan Perkembangan Siswa</small></span></div><span>Semester Ganjil · Tahun Ajaran 2026/2027</span></header>
       <section className="student-report-profile"><span className={`avatar ${selectedStudent.color}`}>{selectedStudent.initials}</span><div><h2>{selectedStudent.name}</h2><p>NIS {selectedStudent.nis} · {activeClass}</p></div><span className="report-predicate"><small>Predikat Akhir</small><strong>{getDevelopmentPredicate(selectedSummary.totalPoints)}</strong></span></section>
       <section className="report-point-grid"><div><span>◇</span><strong>{selectedSummary.portfolioCount}</strong><small>Portofolio · +{selectedSummary.portfolioPoints} poin</small></div><div><span>★</span><strong>+{selectedSummary.achievementPoints}</strong><small>Poin prestasi</small></div><div><span>!</span><strong>-{selectedSummary.violationPoints}</strong><small>Poin pelanggaran</small></div><div className="report-total"><span>∑</span><strong>{selectedSummary.totalPoints}</strong><small>Total poin semester</small></div></section>
@@ -474,15 +516,28 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(true);
   const [activeClass, setActiveClass] = useState<(typeof classOptions)[number]>(classOptions[1]);
   const [classMenuOpen, setClassMenuOpen] = useState(false);
+  const [appData, setAppData] = useState<BootstrapData | null>(null);
+  const refreshData = useCallback(async () => { const response = await fetch(`/api/sikelas?class=${encodeURIComponent(activeClass.label)}`); const payload = await response.json() as BootstrapData & { error?: string }; if (!response.ok) throw new Error(payload.error ?? "Gagal memuat data."); setAppData(payload); }, [activeClass.label]);
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/sikelas?class=${encodeURIComponent(activeClass.label)}`)
+      .then(async (response) => {
+        const payload = await response.json() as BootstrapData & { error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Gagal memuat data.");
+        if (active) setAppData(payload);
+      })
+      .catch(() => { if (active) setAppData(null); });
+    return () => { active = false; };
+  }, [activeClass.label]);
+  const studentRows: StudentRow[] = appData?.students.map((student) => ({ ...student, class: activeClass.label })) ?? (activeClass.label === "XI DKV 1" ? students : []);
+  const actorName = appData?.actor.name ?? "Abdurohman Yusuf";
+  const actorInitials = actorName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const meta = {
     ...pageMeta[page],
     subtitle: pageMeta[page].subtitle.replaceAll("XI DKV 1", activeClass.label),
   };
-
-  if (!loggedIn) return <main className="login-page"><section className="login-brand"><div><Logo /><p>SIKELAS NURUL IMAN</p></div><div><span className="login-ornament">✦</span><h1>Belajar, Berkarya,<br />dan Bertumbuh <em>Bersama.</em></h1><p>Sistem informasi kelas yang menyatukan guru, siswa, dan wali santri dalam satu ruang belajar.</p></div><small>SMK Nurul Iman · Kabupaten Bogor</small></section><section className="login-form-wrap"><form className="login-card" onSubmit={(e) => { e.preventDefault(); setLoggedIn(true); }}><p className="section-kicker">SELAMAT DATANG KEMBALI</p><h2>Masuk ke SIKELAS</h2><p>Silakan gunakan akun sekolah Anda.</p><label>Email atau NIS<input type="text" defaultValue="guru@nuruliman.sch.id" /></label><label>Kata sandi<input type="password" defaultValue="nuruliman" /></label><div className="login-help"><label><input type="checkbox" defaultChecked /> Ingat saya</label><button type="button">Lupa kata sandi?</button></div><button className="primary-button wide" type="submit">Masuk ke Dashboard →</button><small>Demo: klik tombol masuk untuk melanjutkan.</small></form></section></main>;
 
   return (
     <div className="app-shell">
@@ -498,21 +553,21 @@ export default function Home() {
         </div>
         <nav aria-label="Menu utama"><small>MENU UTAMA</small>{navItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "tugas" && <i>3</i>}</button>)}</nav>
         <nav className="secondary-nav" aria-label="Menu lainnya"><small>LAINNYA</small>{secondaryNavItems.map((item) => <button className={page === item.key ? "active" : ""} key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); }}><span>{item.icon}</span>{item.label}{item.key === "pengumuman" && <i>3</i>}</button>)}</nav>
-        <div className="sidebar-footer"><button className="user-card"><span className="avatar teacher">AY</span><span><strong>Abdurohman Yusuf</strong><small>Guru DKV</small></span><i>•••</i></button><button className="logout" onClick={() => setLoggedIn(false)}>↪ Keluar</button></div>
+        <div className="sidebar-footer"><button className="user-card"><span className="avatar teacher">{actorInitials}</span><span><strong>{actorName}</strong><small>{appData?.actor.role ?? "Guru"}</small></span><i>•••</i></button><button className="logout" onClick={() => { window.location.href = "/signout-with-chatgpt?return_to=/"; }}>↪ Keluar</button></div>
       </aside>
       {menuOpen && <button className="overlay" onClick={() => setMenuOpen(false)} aria-label="Tutup menu" />}
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)} aria-label="Buka menu">☰</button><div className="top-context"><strong>{page === "dashboard" ? "Dashboard" : meta.title}</strong><span>SIKELAS <i>/</i> {[...navItems, ...secondaryNavItems].find((item) => item.key === page)?.label} <i>/</i> {activeClass.label}</span></div><div className="topbar-spacer" /><label className="top-search"><span>⌕</span><input placeholder="Cari siswa, tugas, atau materi..." /></label><div className="notification-wrap"><button className="notification-button" onClick={() => { setNotifications(!notifications); setProfileOpen(false); }} aria-label="Notifikasi">♢<i /></button>{notifications && <div className="notification-popover"><strong>Notifikasi</strong><p>3 tugas menunggu penilaian.</p><p>Absensi hari ini belum dikunci.</p></div>}</div><div className="profile-wrap"><button className={profileOpen ? "top-profile active" : "top-profile"} onClick={() => { setProfileOpen(!profileOpen); setNotifications(false); }} aria-expanded={profileOpen} aria-haspopup="menu"><span className="avatar teacher">AY</span><span><strong>Abdurohman Yusuf</strong><small>Guru DKV</small></span><b>{profileOpen ? "⌃" : "⌄"}</b></button>{profileOpen && <div className="profile-popover" role="menu"><div className="profile-popover-head"><span className="avatar teacher">AY</span><span><strong>Abdurohman Yusuf</strong><small>guru@nuruliman.sch.id</small></span></div><div className="profile-meta"><span><small>PERAN</small><strong>Guru DKV</strong></span><span><small>KELAS AKTIF</small><strong>{activeClass.label}</strong></span></div><button role="menuitem" onClick={() => { setPage("pengaturan"); setProfileOpen(false); }}><span>⚙</span>Pengaturan akun</button><button className="profile-logout" role="menuitem" onClick={() => { setProfileOpen(false); setLoggedIn(false); }}><span>↪</span>Keluar dari akun</button></div>}</div></header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)} aria-label="Buka menu">☰</button><div className="top-context"><strong>{page === "dashboard" ? "Dashboard" : meta.title}</strong><span>SIKELAS <i>/</i> {[...navItems, ...secondaryNavItems].find((item) => item.key === page)?.label} <i>/</i> {activeClass.label}</span></div><div className="topbar-spacer" /><label className="top-search"><span>⌕</span><input placeholder="Cari siswa, tugas, atau materi..." /></label><div className="notification-wrap"><button className="notification-button" onClick={() => { setNotifications(!notifications); setProfileOpen(false); }} aria-label="Notifikasi">♢<i /></button>{notifications && <div className="notification-popover"><strong>Notifikasi</strong>{(appData?.notifications ?? []).map((item) => <p key={item.id}>{item.message}</p>)}{!(appData?.notifications.length) && <p>Tidak ada notifikasi baru.</p>}</div>}</div><div className="profile-wrap"><button className={profileOpen ? "top-profile active" : "top-profile"} onClick={() => { setProfileOpen(!profileOpen); setNotifications(false); }} aria-expanded={profileOpen} aria-haspopup="menu"><span className="avatar teacher">{actorInitials}</span><span><strong>{actorName}</strong><small>{appData?.actor.role ?? "Guru"}</small></span><b>{profileOpen ? "⌃" : "⌄"}</b></button>{profileOpen && <div className="profile-popover" role="menu"><div className="profile-popover-head"><span className="avatar teacher">{actorInitials}</span><span><strong>{actorName}</strong><small>{appData?.actor.email ?? "guru@nuruliman.sch.id"}</small></span></div><div className="profile-meta"><span><small>PERAN</small><strong>{appData?.actor.role ?? "Guru"}</strong></span><span><small>KELAS AKTIF</small><strong>{activeClass.label}</strong></span></div><button role="menuitem" onClick={() => { setPage("pengaturan"); setProfileOpen(false); }}><span>⚙</span>Pengaturan akun</button><button className="profile-logout" role="menuitem" onClick={() => { setProfileOpen(false); window.location.href = "/signout-with-chatgpt?return_to=/"; }}><span>↪</span>Keluar dari akun</button></div>}</div></header>
         <div className="page-wrap">
           <div className="page-heading"><div><p>{meta.eyebrow}</p><h1>{meta.title}</h1><span>{meta.subtitle}</span></div>{page === "dashboard" && <div className="weather"><span>☀</span><div><strong>28°C</strong><small>Cerah · Bogor</small></div></div>}</div>
-          {page === "dashboard" && <Dashboard goTo={setPage} activeClass={activeClass} />}
-          {page === "siswa" && <Students activeClass={activeClass} />}
-          {page === "absensi" && <AttendancePage key={activeClass.label} activeClass={activeClass.label} />}
+          {page === "dashboard" && <Dashboard goTo={setPage} activeClass={activeClass} savedAttendance={appData?.attendance ?? []} taskRows={appData?.tasks ?? tasks} />}
+          {page === "siswa" && <Students activeClass={activeClass} studentRows={studentRows} refresh={refreshData} />}
+          {page === "absensi" && <AttendancePage key={`${activeClass.label}-${appData ? "loaded" : "loading"}`} activeClass={activeClass.label} studentRows={studentRows} savedAttendance={appData?.attendance ?? []} />}
           {page === "jadwal" && <SchedulePage activeClass={activeClass.label} />}
-          {page === "tugas" && <TasksPage activeClass={activeClass} />}
-          {page === "perkembangan" && <StudentDevelopmentPage key={activeClass.label} activeClass={activeClass.label} />}
-          {page === "pengumuman" && <AnnouncementsPage activeClass={activeClass.label} />}
-          {page === "portofolio" && <PortfolioPage activeClass={activeClass.label} />}
+          {page === "tugas" && <TasksPage activeClass={activeClass} studentRows={studentRows} taskRows={appData?.tasks ?? tasks} />}
+          {page === "perkembangan" && <StudentDevelopmentPage key={activeClass.label} activeClass={activeClass.label} studentRows={studentRows} pointRules={appData?.pointRules ?? []} auditLogs={appData?.auditLogs ?? []} refresh={refreshData} />}
+          {page === "pengumuman" && <AnnouncementsPage activeClass={activeClass.label} announcementRows={appData?.announcements ?? announcements} refresh={refreshData} />}
+          {page === "portofolio" && <PortfolioPage activeClass={activeClass.label} studentRows={studentRows} portfolioRows={appData?.portfolios ?? portfolioItems} refresh={refreshData} />}
           {page === "pengaturan" && <SettingsPage activeClass={activeClass} />}
         </div>
       </main>

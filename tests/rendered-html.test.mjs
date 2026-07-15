@@ -14,17 +14,22 @@ test("build emits the SIKELAS dashboard and persistent API route", async () => {
   assert.match(page, /Absensi Hari Ini/i);
   assert.match(page, /Rekam Jejak/i);
   assert.match(worker, /api\/development-records/i);
+  assert.match(worker, /api\/sikelas/i);
   assert.match(worker, /CREATE TABLE IF NOT EXISTS development_records/i);
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS attendance_records/i);
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS audit_logs/i);
   assert.doesNotMatch(page + layout, /codex-preview|Your site is taking shape/i);
 });
 
 test("keeps product metadata and removes starter dependencies", async () => {
-  const [page, layout, packageJson, hosting, schema] = await Promise.all([
+  const [page, layout, packageJson, hosting, schema, runtime, api] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/runtime.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/sikelas/route.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /title:\s*"SIKELAS Nurul Iman"/);
@@ -46,6 +51,12 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /api\/development-records/);
   assert.match(hosting, /"d1":\s*"DB"/);
   assert.match(schema, /development_records/);
+  assert.match(schema, /attendance_records/);
+  assert.match(schema, /audit_logs/);
+  assert.match(runtime, /oai-authenticated-user-email/);
+  assert.match(runtime, /requireWriteRole/);
+  assert.match(api, /Barcode tidak sah/);
+  assert.match(api, /notificationRead/);
   assert.match(page, /function BarcodeScanner/);
   assert.match(page, /BrowserMultiFormatReader/);
   assert.match(page, /Scan Barcode/);
@@ -53,6 +64,10 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Seleksi Lomba Kreativitas Siswa/);
   assert.match(page, /Rebranding Kopi Gunung/);
   assert.match(page, /Bobot Penilaian/);
+  assert.match(page, /Aturan Poin & Riwayat Perubahan/);
+  assert.match(page, /Unduh Kartu Barcode/);
+  assert.match(page, /Unduh Rekap/);
+  assert.match(page, /signout-with-chatgpt/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout, /codex-preview|_sites-preview|SkeletonPreview/);
 });

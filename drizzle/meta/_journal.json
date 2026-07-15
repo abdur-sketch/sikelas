@@ -15,6 +15,13 @@
       "when": 1784072549450,
       "tag": "0001_happy_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784096085237,
+      "tag": "0002_tricky_thanos",
+      "breakpoints": true
     }
   ]
 }
