@@ -9,6 +9,10 @@ export const userClassAssignments = sqliteTable("user_class_assignments", {
   id: text("id").primaryKey(), email: text("email").notNull(), classLabel: text("class_label").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [uniqueIndex("user_class_assignment_idx").on(table.email, table.classLabel), index("user_class_email_idx").on(table.email)]);
 
+export const userSubjectAssignments = sqliteTable("user_subject_assignments", {
+  id: text("id").primaryKey(), email: text("email").notNull(), classLabel: text("class_label").notNull(), subject: text("subject").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex("user_subject_assignment_idx").on(table.email, table.classLabel, table.subject), index("user_subject_email_idx").on(table.email)]);
+
 export const classes = sqliteTable("classes", {
   id: text("id").primaryKey(), label: text("label").notNull(), short: text("short").notNull(), boys: integer("boys").notNull(), girls: integer("girls").notNull(),
 }, (table) => [uniqueIndex("classes_label_idx").on(table.label)]);
@@ -32,6 +36,10 @@ export const schedulesTable = sqliteTable("schedules", {
 export const gradesTable = sqliteTable("grades", {
   id: text("id").primaryKey(), nis: text("nis").notNull(), classLabel: text("class_label").notNull(), assignment: integer("assignment").notNull(), practice: integer("practice").notNull(), exam: integer("exam").notNull(), attitude: text("attitude").notNull(), finalScore: integer("final_score").notNull(),
 }, (table) => [uniqueIndex("grades_student_class_idx").on(table.nis, table.classLabel)]);
+
+export const subjectGrades = sqliteTable("subject_grades", {
+  id: text("id").primaryKey(), nis: text("nis").notNull(), classLabel: text("class_label").notNull(), subject: text("subject").notNull(), assignment: integer("assignment").notNull().default(0), practice: integer("practice").notNull().default(0), exam: integer("exam").notNull().default(0), attitude: text("attitude").notNull().default("B"), finalScore: integer("final_score").notNull().default(0), updatedBy: text("updated_by"), updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex("subject_grades_student_idx").on(table.nis, table.classLabel, table.subject), index("subject_grades_class_idx").on(table.classLabel, table.subject)]);
 
 export const academicPeriods = sqliteTable("academic_periods", {
   id: text("id").primaryKey(), label: text("label").notNull(), semester: text("semester").notNull(), startDate: text("start_date").notNull(), endDate: text("end_date").notNull(), active: integer("active", { mode: "boolean" }).notNull().default(false), closedAt: text("closed_at"),

@@ -61,6 +61,10 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(page, /Pemulihan/);
   assert.match(page, /Daftar Pengguna/);
   assert.match(page, /Admin Pusat/);
+  assert.match(page, /Ringkasan Seluruh Sekolah/);
+  assert.match(page, /Penugasan mata pelajaran/);
+  assert.match(page, /Cetak \/ Simpan PDF/);
+  assert.match(page, /QR Verifikasi/);
   assert.match(page, /Akun belum dapat digunakan/);
   assert.match(page, /Pesawaran, Lampung/);
   assert.match(page, /api\.open-meteo\.com\/v1\/forecast/);
@@ -94,11 +98,14 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(schema, /communication_logs/);
   assert.match(schema, /deleted_records/);
   assert.match(schema, /user_class_assignments/);
+  assert.match(schema, /user_subject_assignments/);
+  assert.match(schema, /subject_grades/);
   assert.match(runtime, /oai-authenticated-user-email/);
   assert.match(runtime, /student_nis/);
   assert.match(runtime, /requireWriteRole/);
   assert.match(runtime, /requireAdmin/);
   assert.match(runtime, /requireClassAccess/);
+  assert.match(runtime, /requireSubjectAccess/);
   assert.match(runtime, /PRIMARY_ADMIN_EMAIL/);
   assert.match(api, /Barcode tidak sah/);
   assert.match(api, /notificationRead/);
@@ -106,6 +113,8 @@ test("keeps product metadata and removes starter dependencies", async () => {
   assert.match(api, /todayJakarta/);
   assert.match(api, /accountMapping/);
   assert.match(api, /userManagement/);
+  assert.match(api, /subjectGrade/);
+  assert.match(api, /adminOverview/);
   assert.match(api, /promoteStudents/);
   assert.match(api, /portfolioApproval/);
   assert.match(api, /resource==="restore"/);

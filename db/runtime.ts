@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 
 export type UserRole = "Admin" | "Wali Kelas" | "Guru" | "Siswa" | "Wali Santri";
-export type AppActor = { email: string; name: string; role: UserRole; classLabel: string | null; studentNis: string | null; status: string; active: number; assignedClasses: string[] };
+export type AppActor = { email: string; name: string; role: UserRole; classLabel: string | null; studentNis: string | null; status: string; active: number; assignedClasses: string[]; assignedSubjects: string[] };
 const PRIMARY_ADMIN_EMAIL = "baikganteng88@gmail.com";
 
 const ddl = [
@@ -9,6 +9,9 @@ const ddl = [
   "CREATE TABLE IF NOT EXISTS user_class_assignments (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, class_label TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
   "CREATE UNIQUE INDEX IF NOT EXISTS user_class_assignment_idx ON user_class_assignments (email, class_label)",
   "CREATE INDEX IF NOT EXISTS user_class_email_idx ON user_class_assignments (email)",
+  "CREATE TABLE IF NOT EXISTS user_subject_assignments (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, class_label TEXT NOT NULL, subject TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS user_subject_assignment_idx ON user_subject_assignments (email, class_label, subject)",
+  "CREATE INDEX IF NOT EXISTS user_subject_email_idx ON user_subject_assignments (email)",
   "CREATE TABLE IF NOT EXISTS classes (id TEXT PRIMARY KEY NOT NULL, label TEXT NOT NULL UNIQUE, short TEXT NOT NULL, boys INTEGER NOT NULL, girls INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS students (nis TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, class_label TEXT NOT NULL, gender TEXT NOT NULL, guardian TEXT NOT NULL, status TEXT NOT NULL, initials TEXT NOT NULL, color TEXT NOT NULL, barcode_token TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS students_class_idx ON students (class_label)",
@@ -19,6 +22,9 @@ const ddl = [
   "CREATE INDEX IF NOT EXISTS schedules_class_idx ON schedules (class_label)",
   "CREATE TABLE IF NOT EXISTS grades (id TEXT PRIMARY KEY NOT NULL, nis TEXT NOT NULL, class_label TEXT NOT NULL, assignment INTEGER NOT NULL, practice INTEGER NOT NULL, exam INTEGER NOT NULL, attitude TEXT NOT NULL, final_score INTEGER NOT NULL)",
   "CREATE UNIQUE INDEX IF NOT EXISTS grades_student_class_idx ON grades (nis, class_label)",
+  "CREATE TABLE IF NOT EXISTS subject_grades (id TEXT PRIMARY KEY NOT NULL, nis TEXT NOT NULL, class_label TEXT NOT NULL, subject TEXT NOT NULL, assignment INTEGER NOT NULL DEFAULT 0, practice INTEGER NOT NULL DEFAULT 0, exam INTEGER NOT NULL DEFAULT 0, attitude TEXT NOT NULL DEFAULT 'B', final_score INTEGER NOT NULL DEFAULT 0, updated_by TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS subject_grades_student_idx ON subject_grades (nis, class_label, subject)",
+  "CREATE INDEX IF NOT EXISTS subject_grades_class_idx ON subject_grades (class_label, subject)",
   "CREATE TABLE IF NOT EXISTS academic_periods (id TEXT PRIMARY KEY NOT NULL, label TEXT NOT NULL, semester TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0, closed_at TEXT)",
   "CREATE TABLE IF NOT EXISTS task_submissions (id TEXT PRIMARY KEY NOT NULL, task_id TEXT NOT NULL, nis TEXT NOT NULL, status TEXT NOT NULL, score INTEGER, feedback TEXT NOT NULL DEFAULT '', evidence_url TEXT, submitted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
   "CREATE UNIQUE INDEX IF NOT EXISTS submissions_task_student_idx ON task_submissions (task_id, nis)",
@@ -74,11 +80,13 @@ export async function ensureDatabase(db = getD1()) {
     db.prepare("INSERT OR IGNORE INTO users (email,name,role,status,active,approved_by) VALUES (?,?,?,'Active',1,?)").bind(PRIMARY_ADMIN_EMAIL,"Abdurohman Yusuf","Admin",PRIMARY_ADMIN_EMAIL),
     db.prepare("UPDATE users SET name='Abdurohman Yusuf',role='Admin',status='Active',active=1,approved_by=?,updated_at=CURRENT_TIMESTAMP WHERE email=?").bind(PRIMARY_ADMIN_EMAIL,PRIMARY_ADMIN_EMAIL),
     db.prepare("INSERT OR IGNORE INTO user_class_assignments (id,email,class_label) VALUES (?,?,?)").bind("assign-seed-wali-xi","guru@nuruliman.sch.id","XI DKV 1"),
+    ...["Desain Grafis","Fotografi","Animasi Dasar","Bahasa Indonesia"].map((subject,index)=>db.prepare("INSERT OR IGNORE INTO user_subject_assignments (id,email,class_label,subject) VALUES (?,?,?,?)").bind(`assign-seed-subject-${index}`,"guru@nuruliman.sch.id","XI DKV 1",subject)),
     ...[["x","X DKV 1","X",3,3],["xi","XI DKV 1","XI",0,6],["xii","XII DKV 1","XII",3,3]].map((c) => db.prepare("INSERT OR IGNORE INTO classes (id,label,short,boys,girls) VALUES (?,?,?,?,?)").bind(...c)),
     ...studentSeed.map((s) => db.prepare("INSERT OR IGNORE INTO students (nis,name,class_label,gender,guardian,status,initials,color,barcode_token) VALUES (?,?,?,?,?,'Aktif',?,?,?)").bind(...s, `NI-${s[0]}-2026`)),
     ...[["t1","Poster Hari Kemerdekaan","XI DKV 1","Desain Grafis","2026-07-16",5,6,"Berjalan","green"],["t2","Foto Produk Lokal","XI DKV 1","Fotografi","2026-07-18",4,6,"Berjalan","gold"],["t3","Esai Budaya Pesantren","XI DKV 1","Bahasa Indonesia","2026-07-20",2,6,"Baru","blue"],["t4","Animasi Logo Sekolah","XI DKV 1","Animasi Dasar","2026-07-11",6,6,"Selesai","purple"]].map((t) => db.prepare("INSERT OR IGNORE INTO tasks (id,title,class_label,subject,due,submitted,total,status,tone) VALUES (?,?,?,?,?,?,?,?,?)").bind(...t)),
     ...["X DKV 1","XI DKV 1","XII DKV 1"].flatMap((classLabel,classIndex) => [["Senin","07:00","Matematika","Ust. Ahmad Fauzi",`Ruang ${classLabel}`,"0"],["Senin","08:30","Desain Grafis","Abdurohman Yusuf","Lab DKV","1"],["Selasa","07:00","Fotografi","Riki Ardian Pratama","Studio Foto","2"],["Rabu","10:15","Animasi Dasar","Abdurohman Yusuf","Lab DKV","3"],["Kamis","12:45","Bahasa Inggris","Miftah Nurul Hikmah",`Ruang ${classLabel}`,"0"],["Jumat","07:00","Proyek Kreatif","Abdurohman Yusuf","Lab DKV","1"]].map((s,index) => db.prepare("INSERT OR IGNORE INTO schedules (id,class_label,day,start_time,subject,teacher,room,tone) VALUES (?,?,?,?,?,?,?,?)").bind(`sch-${classIndex}-${index}`,classLabel,...s))),
     ...studentSeed.map((s,index) => db.prepare("INSERT OR IGNORE INTO grades (id,nis,class_label,assignment,practice,exam,attitude,final_score) VALUES (?,?,?,?,?,?,?,?)").bind(`grade-${s[0]}`,s[0],s[2],82+(index%7),85+(index%6),80+(index%8),"A",83+(index%6))),
+    ...studentSeed.flatMap((s,studentIndex)=>["Desain Grafis","Fotografi","Bahasa Indonesia","Animasi Dasar"].map((subject,subjectIndex)=>{const assignment=78+((studentIndex+subjectIndex)%13),practice=80+((studentIndex+subjectIndex*2)%12),exam=76+((studentIndex+subjectIndex*3)%14),finalScore=Math.round(assignment*.25+practice*.35+exam*.3+10);return db.prepare("INSERT OR IGNORE INTO subject_grades (id,nis,class_label,subject,assignment,practice,exam,attitude,final_score) VALUES (?,?,?,?,?,?,?,?,?)").bind(`subject-grade-${s[0]}-${subjectIndex}`,s[0],s[2],subject,assignment,practice,exam,"A",finalScore)})),
     ...["X DKV 1","XI DKV 1","XII DKV 1"].map((classLabel) => db.prepare("INSERT OR IGNORE INTO settings (class_label,school_name,npsn,school_email,phone,address,homeroom,academic_year,room,entry_time,late_time,end_time,min_attendance,assignment_weight,practice_weight,exam_weight,attitude_weight,kkm) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(classLabel,"SMK Nurul Iman","69912345","admin@nuruliman.sch.id","(0251) 8654 321","Kabupaten Bogor, Jawa Barat","Abdurohman Yusuf","2026/2027",`Ruang ${classLabel}`,"07:00","07:15","14:15",80,25,35,30,10,75)),
     db.prepare("INSERT OR IGNORE INTO academic_periods (id,label,semester,start_date,end_date,active) VALUES ('period-2026-1','2026/2027','Ganjil','2026-07-01','2026-12-18',1)"),
     ...[["a1","Seleksi Lomba Kreativitas Siswa","Kegiatan","Semua Kelas","2026-07-17","Abdurohman Yusuf","Penting","Terbit","Setiap siswa DKV diminta membawa satu karya terbaik untuk proses kurasi di Lab DKV."],["a2","Jadwal Penilaian Tengah Semester","Akademik","Semua Kelas","2026-07-20","Wakasek Kurikulum","Penting","Terjadwal","PTS semester ganjil dilaksanakan mulai 3 Agustus."],["a3","Perlengkapan Praktik Fotografi","Perlengkapan","XI DKV 1","2026-07-15","Riki Ardian Pratama","Normal","Terbit","Siswa membawa kamera atau ponsel dan kain latar polos."]].map((a) => db.prepare("INSERT OR IGNORE INTO announcements (id,title,category,audience,date,author,priority,status,excerpt) VALUES (?,?,?,?,?,?,?,?,?)").bind(...a)),
@@ -95,11 +103,12 @@ export async function getActor(request: Request): Promise<AppActor> {
   const email = (request.headers.get("oai-authenticated-user-email") || (new URL(request.url).hostname === "localhost" ? "guru@nuruliman.sch.id" : "")).trim().toLowerCase();
   if (!email) throw new Error("Sesi pengguna tidak tersedia.");
   const db = await ensureDatabase();
-  const user = await db.prepare("SELECT email,name,role,class_label AS classLabel,student_nis AS studentNis,status,active FROM users WHERE email=?").bind(email).first<Omit<AppActor,"assignedClasses">>();
+  const user = await db.prepare("SELECT email,name,role,class_label AS classLabel,student_nis AS studentNis,status,active FROM users WHERE email=?").bind(email).first<Omit<AppActor,"assignedClasses"|"assignedSubjects">>();
   if (user) {
     if (!Number(user.active) || user.status !== "Active") throw new Error(user.status === "Pending" ? "Akun menunggu persetujuan Admin Pusat." : "Akun Anda sedang dinonaktifkan.");
     const assignments = await db.prepare("SELECT class_label AS classLabel FROM user_class_assignments WHERE email=? ORDER BY class_label").bind(email).all<{classLabel:string}>();
-    return { ...user, active:Number(user.active), assignedClasses:assignments.results.map((item)=>item.classLabel) };
+    const subjectAssignments = await db.prepare("SELECT class_label AS classLabel,subject FROM user_subject_assignments WHERE email=? ORDER BY class_label,subject").bind(email).all<{classLabel:string;subject:string}>();
+    return { ...user, active:Number(user.active), assignedClasses:assignments.results.map((item)=>item.classLabel), assignedSubjects:subjectAssignments.results.map((item)=>`${item.classLabel}::${item.subject}`) };
   }
   const nameHeader = request.headers.get("oai-authenticated-user-full-name");
   const name = nameHeader ? decodeURIComponent(nameHeader) : email.split("@")[0];
@@ -123,4 +132,10 @@ export function requireClassAccess(actor: AppActor, classLabel: string) {
   if (actor.role === "Admin") return;
   const allowed = new Set([actor.classLabel, ...actor.assignedClasses].filter(Boolean));
   if (!classLabel || !allowed.has(classLabel)) throw new Error("Anda tidak ditugaskan pada kelas ini.");
+}
+
+export function requireSubjectAccess(actor: AppActor, classLabel: string, subject: string) {
+  requireClassAccess(actor,classLabel);
+  if (actor.role === "Admin" || actor.role === "Wali Kelas") return;
+  if (!subject || !actor.assignedSubjects.includes(`${classLabel}::${subject}`)) throw new Error("Anda tidak ditugaskan mengajar mata pelajaran ini.");
 }
